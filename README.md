@@ -34,11 +34,16 @@ Tout ajout ou correctif passe par une branche dédiée, jamais par un commit dir
 
 Projet Google Cloud : `logbook-513714`. Client OAuth Web "Logbook Web" créé, origines autorisées `https://lchouville.github.io` et `http://localhost:8080`, scope `drive.file`. L'écran de consentement est en mode Externe/Test : seuls les comptes ajoutés dans "Utilisateurs tests" (console Google Cloud) peuvent se connecter. Le Client ID est dans `js/config.js` — public par nature (visible côté client), à ne pas confondre avec le code secret du client (jamais utilisé ni stocké ici, une app statique sans backend n'en a pas besoin).
 
+## Stockage Drive
+
+Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, créé par l'app dans le Drive de l'utilisateur (`js/drive.js`, scope `drive.file` — l'app ne voit que les fichiers qu'elle crée elle-même). Modèle d'une entrée (`js/entries.js`) : thème(s), niveau d'accès (N1-N5), statut (A Valider / A Compléter / Complete / Bilan), type de journée, mesures du soir (énergie, ressenti /10), texte, et un `ressentiAFroid` rempli plus tard (pas encore d'UI dédiée).
+
 ## État du projet
 
 - [x] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
 - [x] Implémenter la connexion Google (Google Identity Services).
 - [x] Activer GitHub Pages sur la branche `gh-page`.
-- [ ] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
-- [ ] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
+- [x] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
+- [x] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
+- [ ] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).
 - [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
