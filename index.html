@@ -23,13 +23,19 @@
         <select id="entry-themes" multiple required></select>
 
         <label for="entry-niveau">Niveau d'accès</label>
-        <select id="entry-niveau" required></select>
+        <select id="entry-niveau" required>
+          <option value="" disabled selected>Choisir…</option>
+        </select>
 
         <label for="entry-statut">Statut</label>
-        <select id="entry-statut" required></select>
+        <select id="entry-statut" required>
+          <option value="" disabled selected>Choisir…</option>
+        </select>
 
         <label for="entry-type-journee">Type de journée</label>
-        <select id="entry-type-journee" required></select>
+        <select id="entry-type-journee" required>
+          <option value="" disabled selected>Choisir…</option>
+        </select>
 
         <label for="entry-energie">Énergie (0-10)</label>
         <input id="entry-energie" type="number" min="0" max="10" step="0.5">
