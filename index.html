@@ -16,6 +16,41 @@
       <button id="sign-out" type="button" hidden>Se déconnecter</button>
       <p id="auth-status">Non connecté.</p>
     </section>
+    <section id="entries" hidden>
+      <h2>Nouvelle entrée</h2>
+      <form id="entry-form">
+        <label for="entry-themes">Thème(s)</label>
+        <select id="entry-themes" multiple required></select>
+
+        <label for="entry-niveau">Niveau d'accès</label>
+        <select id="entry-niveau" required>
+          <option value="" disabled selected>Choisir…</option>
+        </select>
+
+        <label for="entry-statut">Statut</label>
+        <select id="entry-statut" required>
+          <option value="" disabled selected>Choisir…</option>
+        </select>
+
+        <label for="entry-type-journee">Type de journée</label>
+        <select id="entry-type-journee" required>
+          <option value="" disabled selected>Choisir…</option>
+        </select>
+
+        <label for="entry-energie">Énergie (0-10)</label>
+        <input id="entry-energie" type="number" min="0" max="10" step="0.5">
+
+        <label for="entry-ressenti">Ressenti (0-10)</label>
+        <input id="entry-ressenti" type="number" min="0" max="10" step="0.5">
+
+        <label for="entry-texte">Texte</label>
+        <textarea id="entry-texte" rows="4"></textarea>
+
+        <button type="submit">Enregistrer</button>
+      </form>
+      <h2>Entrées</h2>
+      <ul id="entry-list"></ul>
+    </section>
   </main>
   <script type="module" src="js/app.js"></script>
 </body>
