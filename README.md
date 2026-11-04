@@ -10,7 +10,7 @@ Journal de bord personnel, accessible en ligne, hébergé gratuitement sur GitHu
 
 ## Stack
 
-HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : rester simple, maintenable sur le long terme, et sobre en ressources (pas de pipeline CI, pas de dépendances à mettre à jour).
+HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : rester simple, maintenable sur le long terme, et sobre en ressources (pas de dépendances à mettre à jour côté app).
 
 ## Branches
 
@@ -19,6 +19,8 @@ HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : re
 - `gh-page` — branche servie par GitHub Pages (site public à l'URL `https://lchouville.github.io/logbook/`).
 
 Flux : `develop` → `release` → `gh-page`.
+
+`release` et `gh-page` sont protégées : push direct interdit, passage obligatoire par une Pull Request. Une CI légère (GitHub Actions, voir `.github/workflows/ci.yml`) valide le HTML sur chaque PR vers ces branches ; la PR ne peut être mergée que si ce contrôle passe.
 
 ## État du projet
 
