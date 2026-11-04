@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [release, gh-page]
+    branches: [develop, release, gh-page]
 
 jobs:
   html-validate:
