@@ -20,7 +20,15 @@ HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : re
 
 Flux : `develop` → `release` → `gh-page`.
 
-`release` et `gh-page` sont protégées : push direct interdit, passage obligatoire par une Pull Request. Une CI légère (GitHub Actions, voir `.github/workflows/ci.yml`) valide le HTML sur chaque PR vers ces branches ; la PR ne peut être mergée que si ce contrôle passe.
+`develop`, `release` et `gh-page` sont protégées : push direct interdit, passage obligatoire par une Pull Request. Une CI légère (GitHub Actions, voir `.github/workflows/ci.yml`) valide le HTML sur chaque PR vers ces branches ; la PR ne peut être mergée que si ce contrôle passe.
+
+## Workflow de contribution
+
+Tout ajout ou correctif passe par une branche dédiée, jamais par un commit direct :
+
+- `feature/<nom>` — nouvelle fonctionnalité. Part de `develop`, PR vers `develop`.
+- `fix/<correctif>` — correction non urgente. Part de `develop`, PR vers `develop`.
+- `hotfix/<correctif>` — correction urgente sur une version déjà publiée. Part de `release`, PR vers `release`, puis `release` est mergée vers `gh-page` et reportée (merge ou cherry-pick) sur `develop` pour ne pas perdre le correctif.
 
 ## État du projet
 
