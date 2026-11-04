@@ -10,7 +10,7 @@ Journal de bord personnel, accessible en ligne, hébergé gratuitement sur GitHu
 
 ## Stack
 
-HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : rester simple, maintenable sur le long terme, et sobre en ressources (pas de pipeline CI, pas de dépendances à mettre à jour).
+HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : rester simple, maintenable sur le long terme, et sobre en ressources (pas de dépendances à mettre à jour côté app).
 
 ## Branches
 
@@ -20,12 +20,30 @@ HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : re
 
 Flux : `develop` → `release` → `gh-page`.
 
+`develop`, `release` et `gh-page` sont protégées : push direct interdit, passage obligatoire par une Pull Request. Une CI légère (GitHub Actions, voir `.github/workflows/ci.yml`) valide le HTML sur chaque PR vers ces branches ; la PR ne peut être mergée que si ce contrôle passe.
+
+## Workflow de contribution
+
+Tout ajout ou correctif passe par une branche dédiée, jamais par un commit direct :
+
+- `feature/<nom>` — nouvelle fonctionnalité. Part de `develop`, PR vers `develop`.
+- `fix/<correctif>` — correction non urgente. Part de `develop`, PR vers `develop`.
+- `hotfix/<correctif>` — correction urgente sur une version déjà publiée. Part de `release`, PR vers `release`, puis `release` est mergée vers `gh-page` et reportée (merge ou cherry-pick) sur `develop` pour ne pas perdre le correctif.
+
+## Configuration Google OAuth
+
+Projet Google Cloud : `logbook-513714`. Client OAuth Web "Logbook Web" créé, origines autorisées `https://lchouville.github.io` et `http://localhost:8080`, scope `drive.file`. L'écran de consentement est en mode Externe/Test : seuls les comptes ajoutés dans "Utilisateurs tests" (console Google Cloud) peuvent se connecter. Le Client ID est dans `js/config.js` — public par nature (visible côté client), à ne pas confondre avec le code secret du client (jamais utilisé ni stocké ici, une app statique sans backend n'en a pas besoin).
+
+## Stockage Drive
+
+Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dans le dossier `Application/logbook` du Drive de l'utilisateur (créés automatiquement au premier enregistrement si absents, en couleur Lavande `#CD74E6`). `js/drive.js` gère ça avec le scope `drive.file` — l'app ne voit que les fichiers/dossiers qu'elle crée elle-même. Si un ancien `logbook-data.json` traîne à la racine du Drive (créé avant l'introduction de ce dossier), il est automatiquement déplacé dans `Application/logbook` au lieu d'être dupliqué. Modèle d'une entrée (`js/entries.js`) : thème(s), niveau d'accès (N1-N5), statut (A Valider / A Compléter / Complete / Bilan), type de journée, mesures du soir (énergie, ressenti /10), texte, et un `ressentiAFroid` rempli plus tard (pas encore d'UI dédiée).
+
 ## État du projet
 
-Scaffold initial uniquement. Prochaines étapes :
-
-- [ ] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
-- [ ] Implémenter la connexion Google (Google Identity Services).
-- [ ] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
-- [ ] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
-- [ ] Activer GitHub Pages sur la branche `gh-page`.
+- [x] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
+- [x] Implémenter la connexion Google (Google Identity Services).
+- [x] Activer GitHub Pages sur la branche `gh-page`.
+- [x] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
+- [x] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
+- [ ] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).
+- [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
