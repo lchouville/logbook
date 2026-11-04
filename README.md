@@ -30,12 +30,15 @@ Tout ajout ou correctif passe par une branche dédiée, jamais par un commit dir
 - `fix/<correctif>` — correction non urgente. Part de `develop`, PR vers `develop`.
 - `hotfix/<correctif>` — correction urgente sur une version déjà publiée. Part de `release`, PR vers `release`, puis `release` est mergée vers `gh-page` et reportée (merge ou cherry-pick) sur `develop` pour ne pas perdre le correctif.
 
+## Configuration Google OAuth
+
+Projet Google Cloud : `logbook-513714`. Client OAuth Web "Logbook Web" créé, origines autorisées `https://lchouville.github.io` et `http://localhost:8080`, scope `drive.file`. L'écran de consentement est en mode Externe/Test : seuls les comptes ajoutés dans "Utilisateurs tests" (console Google Cloud) peuvent se connecter. Le Client ID est dans `js/config.js` — public par nature (visible côté client), à ne pas confondre avec le code secret du client (jamais utilisé ni stocké ici, une app statique sans backend n'en a pas besoin).
+
 ## État du projet
 
-Scaffold initial uniquement. Prochaines étapes :
-
-- [ ] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
-- [ ] Implémenter la connexion Google (Google Identity Services).
+- [x] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
+- [x] Implémenter la connexion Google (Google Identity Services).
+- [x] Activer GitHub Pages sur la branche `gh-page`.
 - [ ] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
 - [ ] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
-- [ ] Activer GitHub Pages sur la branche `gh-page`.
+- [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
