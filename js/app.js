@@ -15,6 +15,7 @@ const entryEnergie = document.getElementById('entry-energie');
 const entryRessenti = document.getElementById('entry-ressenti');
 const entryTexte = document.getElementById('entry-texte');
 const entryList = document.getElementById('entry-list');
+const entryError = document.getElementById('entry-error');
 
 let entries = [];
 
@@ -46,6 +47,7 @@ signOutButton.addEventListener('click', signOut);
 
 entryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  entryError.textContent = '';
   const themes = Array.from(entryThemes.selectedOptions).map((option) => option.value);
   const entry = createEntry({
     date: new Date().toISOString().slice(0, 10),
@@ -57,10 +59,16 @@ entryForm.addEventListener('submit', async (event) => {
     ressenti: entryRessenti.valueAsNumber,
     texte: entryTexte.value,
   });
-  entries.push(entry);
-  renderEntries();
-  entryForm.reset();
-  await saveEntries(entries);
+  const previousEntries = entries;
+  entries = [...entries, entry];
+  try {
+    await saveEntries(entries);
+    renderEntries();
+    entryForm.reset();
+  } catch (error) {
+    entries = previousEntries;
+    entryError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
 });
 
 onAuthChange(async (token) => {
@@ -69,11 +77,16 @@ onAuthChange(async (token) => {
   signOutButton.hidden = !connected;
   entriesSection.hidden = !connected;
   authStatus.textContent = connected ? 'Connecté à Google Drive.' : 'Non connecté.';
+  entryError.textContent = '';
   if (connected) {
-    entries = await loadEntries();
-    renderEntries();
+    try {
+      entries = await loadEntries();
+    } catch (error) {
+      entries = [];
+      entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
+    }
   } else {
     entries = [];
-    renderEntries();
   }
+  renderEntries();
 });

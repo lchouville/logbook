@@ -12,6 +12,12 @@ function authHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
+async function describeError(response) {
+  const body = await response.json().catch(() => null);
+  const apiMessage = body?.error?.message;
+  return apiMessage ? `${response.status} ${apiMessage}` : `${response.status} ${response.statusText}`;
+}
+
 async function findFileId() {
   if (fileIdCache) return fileIdCache;
   const params = new URLSearchParams({
@@ -20,7 +26,7 @@ async function findFileId() {
     fields: 'files(id,name)',
   });
   const response = await fetch(`${DRIVE_FILES_URL}?${params}`, { headers: authHeaders() });
-  if (!response.ok) throw new Error('Erreur lors de la recherche du fichier Drive.');
+  if (!response.ok) throw new Error(`Recherche du fichier Drive : ${await describeError(response)}`);
   const data = await response.json();
   fileIdCache = data.files?.[0]?.id ?? null;
   return fileIdCache;
@@ -37,7 +43,7 @@ async function createFile(entries) {
     headers: authHeaders(),
     body: form,
   });
-  if (!response.ok) throw new Error('Erreur lors de la création du fichier Drive.');
+  if (!response.ok) throw new Error(`Création du fichier Drive : ${await describeError(response)}`);
   const data = await response.json();
   fileIdCache = data.id;
   return fileIdCache;
@@ -49,14 +55,14 @@ async function updateFile(fileId, entries) {
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(entries),
   });
-  if (!response.ok) throw new Error('Erreur lors de la mise à jour du fichier Drive.');
+  if (!response.ok) throw new Error(`Mise à jour du fichier Drive : ${await describeError(response)}`);
 }
 
 export async function loadEntries() {
   const fileId = await findFileId();
   if (!fileId) return [];
   const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, { headers: authHeaders() });
-  if (!response.ok) throw new Error('Erreur lors de la lecture du fichier Drive.');
+  if (!response.ok) throw new Error(`Lecture du fichier Drive : ${await describeError(response)}`);
   return response.json();
 }
 
