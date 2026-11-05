@@ -268,3 +268,14 @@ form button[type="submit"] {
   color: var(--color-danger);
   min-height: 1.25rem;
 }
+
+footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.8125rem;
+}
+
+footer a {
+  color: var(--color-fg-secondary);
+}
