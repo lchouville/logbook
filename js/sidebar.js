@@ -2,11 +2,40 @@ const COLLAPSED_KEY = 'logbook_sidebar_collapsed';
 
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebar = document.getElementById('sidebar');
+const sidebarOwnerAvatar = document.getElementById('sidebar-owner-avatar');
 const sidebarOwnerName = document.getElementById('sidebar-owner-name');
+const sidebarProfileButton = document.getElementById('sidebar-profile-button');
+const sidebarProfileMenu = document.getElementById('sidebar-profile-menu');
 const sidebarSettingsButton = document.getElementById('sidebar-settings-button');
 const sidebarJournaux = document.getElementById('sidebar-journaux');
 const sidebarJournauxPlus = document.getElementById('sidebar-journaux-plus');
 const sidebarPartageButton = document.getElementById('sidebar-partage-button');
+
+function closeProfileMenu() {
+  sidebarProfileMenu.hidden = true;
+  sidebarProfileButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleProfileMenu() {
+  const willOpen = sidebarProfileMenu.hidden;
+  sidebarProfileMenu.hidden = !willOpen;
+  sidebarProfileButton.setAttribute('aria-expanded', String(willOpen));
+}
+
+sidebarProfileButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  toggleProfileMenu();
+});
+
+document.addEventListener('click', (event) => {
+  if (!sidebarProfileMenu.hidden && !event.target.closest('#sidebar-profile')) closeProfileMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !sidebarProfileMenu.hidden) closeProfileMenu();
+});
+
+sidebarProfileMenu.addEventListener('click', closeProfileMenu);
 
 function getInitialCollapsed() {
   const stored = localStorage.getItem(COLLAPSED_KEY);
@@ -46,6 +75,7 @@ export function initSidebar({ onSelectJournal, onOpenSettings, onOpenPartages, o
 
 export function renderSidebar({ ownerName, partagesRecus, activeJournalId }) {
   sidebarOwnerName.textContent = ownerName ?? 'Logbook';
+  sidebarOwnerAvatar.textContent = (ownerName ?? 'L').trim().charAt(0).toUpperCase();
 
   sidebarJournaux.innerHTML = '';
 

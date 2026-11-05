@@ -60,10 +60,15 @@ lecture seule (`#journal-partage`, logique dans `js/viewer.js`, ex-`partage.js`)
 La sidebar liste "Mon journal de bord" puis les 4 partages reçus les plus
 récemment ouverts (triés par `dernierAccesLe` dans `logbook-partages-recus.json`,
 mis à jour à chaque affichage, pas seulement au premier), avec un bouton
-"Voir tout" vers la modale Accès pour la liste complète. Les pages Paramètres et
+"Voir tout" vers la modale Accès pour la liste complète. Paramètres et
 Partage (gérer mes partages) sont des modales (`js/modal.js`, simple
 show/hide des sections `#settings`/`#partages`/`#partages-recus` dans un
 panneau unique, pas de nouvelle page).
+
+Le profil (avatar + nom en haut de la sidebar) est un bouton qui ouvre un petit
+menu déroulant ("Paramètres", "Se déconnecter") plutôt que des boutons
+dispersés dans la sidebar — ferme au clic extérieur, à Échap, ou après avoir
+cliqué une option.
 
 Le lien d'un journal partagé est maintenant `index.html?journal=<fichierId>`
 (géré via `history.pushState`/`popstate`, pas de rechargement en cliquant
