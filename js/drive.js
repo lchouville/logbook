@@ -2,14 +2,18 @@ import { getAccessToken } from './auth.js';
 
 const APP_FOLDER_NAME = 'Application';
 const DATA_FOLDER_NAME = 'logbook';
-const FILE_NAME = 'logbook-data.json';
+const PARTAGES_FOLDER_NAME = 'partages';
+const DATA_FILE_NAME = 'logbook-data.json';
+const SETTINGS_FILE_NAME = 'logbook-settings.json';
+const PARTAGES_FILE_NAME = 'logbook-partages.json';
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 const FOLDER_COLOR = '#cd74e6'; // Lavande (palette officielle Google Drive)
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 
 let folderIdCache = null;
-let fileIdCache = null;
+let partagesFolderIdCache = null;
+const fileIdCache = new Map();
 
 function authHeaders() {
   const token = getAccessToken();
@@ -65,9 +69,16 @@ async function getDataFolderId() {
   return folderIdCache;
 }
 
+async function getPartagesFolderId() {
+  if (partagesFolderIdCache) return partagesFolderIdCache;
+  const dataFolderId = await getDataFolderId();
+  partagesFolderIdCache = await findOrCreateFolder(PARTAGES_FOLDER_NAME, dataFolderId);
+  return partagesFolderIdCache;
+}
+
 async function migrateLegacyFile(folderId) {
   const params = new URLSearchParams({
-    q: `name='${FILE_NAME}' and trashed=false`,
+    q: `name='${DATA_FILE_NAME}' and trashed=false`,
     spaces: 'drive',
     fields: 'files(id,parents)',
   });
@@ -90,27 +101,26 @@ async function migrateLegacyFile(folderId) {
   return legacyFile.id;
 }
 
-async function findFileId() {
-  if (fileIdCache) return fileIdCache;
-  const folderId = await getDataFolderId();
+async function findFileId(fileName, folderId) {
+  if (fileIdCache.has(fileName)) return fileIdCache.get(fileName);
   const params = new URLSearchParams({
-    q: `name='${FILE_NAME}' and trashed=false and '${folderId}' in parents`,
+    q: `name='${fileName}' and trashed=false and '${folderId}' in parents`,
     spaces: 'drive',
     fields: 'files(id,name)',
   });
   const response = await fetch(`${DRIVE_FILES_URL}?${params}`, { headers: authHeaders() });
   if (!response.ok) throw new Error(`Recherche du fichier Drive : ${await describeError(response)}`);
   const data = await response.json();
-  fileIdCache = data.files?.[0]?.id ?? (await migrateLegacyFile(folderId));
-  return fileIdCache;
+  const fileId = data.files?.[0]?.id ?? (fileName === DATA_FILE_NAME ? await migrateLegacyFile(folderId) : null);
+  fileIdCache.set(fileName, fileId);
+  return fileId;
 }
 
-async function createFile(entries) {
-  const folderId = await getDataFolderId();
-  const metadata = { name: FILE_NAME, mimeType: 'application/json', parents: [folderId] };
+async function createFile(fileName, content, folderId) {
+  const metadata = { name: fileName, mimeType: 'application/json', parents: [folderId] };
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', new Blob([JSON.stringify(entries)], { type: 'application/json' }));
+  form.append('file', new Blob([JSON.stringify(content)], { type: 'application/json' }));
 
   const response = await fetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id`, {
     method: 'POST',
@@ -119,32 +129,83 @@ async function createFile(entries) {
   });
   if (!response.ok) throw new Error(`Création du fichier Drive : ${await describeError(response)}`);
   const data = await response.json();
-  fileIdCache = data.id;
-  return fileIdCache;
+  fileIdCache.set(fileName, data.id);
+  return data.id;
 }
 
-async function updateFile(fileId, entries) {
+async function updateFile(fileId, content) {
   const response = await fetch(`${DRIVE_UPLOAD_URL}/${fileId}?uploadType=media`, {
     method: 'PATCH',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(entries),
+    body: JSON.stringify(content),
   });
   if (!response.ok) throw new Error(`Mise à jour du fichier Drive : ${await describeError(response)}`);
 }
 
-export async function loadEntries() {
-  const fileId = await findFileId();
-  if (!fileId) return [];
+async function loadJsonFile(fileName, fallback, folderId) {
+  const fileId = await findFileId(fileName, folderId);
+  if (!fileId) return fallback;
   const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, { headers: authHeaders() });
   if (!response.ok) throw new Error(`Lecture du fichier Drive : ${await describeError(response)}`);
   return response.json();
 }
 
-export async function saveEntries(entries) {
-  const fileId = await findFileId();
+async function saveJsonFile(fileName, content, folderId) {
+  const fileId = await findFileId(fileName, folderId);
   if (fileId) {
-    await updateFile(fileId, entries);
-  } else {
-    await createFile(entries);
+    await updateFile(fileId, content);
+    return fileId;
   }
+  return createFile(fileName, content, folderId);
+}
+
+export async function loadEntries() {
+  return loadJsonFile(DATA_FILE_NAME, [], await getDataFolderId());
+}
+
+export async function saveEntries(entries) {
+  return saveJsonFile(DATA_FILE_NAME, entries, await getDataFolderId());
+}
+
+export async function loadSettings() {
+  return loadJsonFile(SETTINGS_FILE_NAME, {}, await getDataFolderId());
+}
+
+export async function saveSettings(settings) {
+  return saveJsonFile(SETTINGS_FILE_NAME, settings, await getDataFolderId());
+}
+
+export async function loadPartages() {
+  return loadJsonFile(PARTAGES_FILE_NAME, [], await getDataFolderId());
+}
+
+export async function savePartages(partages) {
+  return saveJsonFile(PARTAGES_FILE_NAME, partages, await getDataFolderId());
+}
+
+export async function saveSharedEntries(fileName, entries) {
+  return saveJsonFile(fileName, entries, await getPartagesFolderId());
+}
+
+export async function shareFileWithEmail(fileId, email) {
+  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'user', emailAddress: email }),
+  });
+  if (!response.ok) throw new Error(`Partage du fichier Drive : ${await describeError(response)}`);
+}
+
+export async function deleteSharedFile(fileId) {
+  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(`Suppression du fichier Drive : ${await describeError(response)}`);
+}
+
+export async function loadSharedFile(fileId) {
+  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, { headers: authHeaders() });
+  if (!response.ok) throw new Error(`Lecture du fichier partagé : ${await describeError(response)}`);
+  return response.json();
 }
