@@ -17,3 +17,7 @@ export function createEntry({ date, themes, niveauAcces, statut, typeJournee, en
     creeLe: new Date().toISOString(),
   };
 }
+
+export function filtrerEntreesPartage(entries, regles) {
+  return entries.filter((entry) => entry.themes.some((theme) => regles[theme]?.includes(entry.niveauAcces)));
+}

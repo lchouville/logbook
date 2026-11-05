@@ -34,6 +34,8 @@ Tout ajout ou correctif passe par une branche dédiée, jamais par un commit dir
 
 Projet Google Cloud : `logbook-513714`. Client OAuth Web "Logbook Web" créé, origines autorisées `https://lchouville.github.io` et `http://localhost:8080`, scope `drive.file`. L'écran de consentement est en mode Externe/Test : seuls les comptes ajoutés dans "Utilisateurs tests" (console Google Cloud) peuvent se connecter. Le Client ID est dans `js/config.js` — public par nature (visible côté client), à ne pas confondre avec le code secret du client (jamais utilisé ni stocké ici, une app statique sans backend n'en a pas besoin).
 
+Pour le partage (voir plus bas), l'API Picker doit aussi être activée dans ce projet : Google Cloud Console → APIs & Services → Identifiants → Créer des identifiants → Clé API, restreinte à l'API Picker et aux référents HTTP `http://localhost:8080/*` et `https://lchouville.github.io/*`. La clé va dans `GOOGLE_PICKER_API_KEY` (`js/config.js`), publique comme le Client ID.
+
 ## Stockage Drive
 
 Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dans le dossier `Application/logbook` du Drive de l'utilisateur (créés automatiquement au premier enregistrement si absents, en couleur Lavande `#CD74E6`). `js/drive.js` gère ça avec le scope `drive.file` — l'app ne voit que les fichiers/dossiers qu'elle crée elle-même. Si un ancien `logbook-data.json` traîne à la racine du Drive (créé avant l'introduction de ce dossier), il est automatiquement déplacé dans `Application/logbook` au lieu d'être dupliqué. Modèle d'une entrée (`js/entries.js`) : thème(s), niveau d'accès (N1-N5), statut (A Valider / A Compléter / Complete / Bilan), type de journée, mesures du soir (énergie, ressenti /10), texte, et un `ressentiAFroid` rempli plus tard (pas encore d'UI dédiée).
@@ -46,6 +48,16 @@ Le thème par défaut s'inspire visuellement de Notion (typo système, bordures 
 
 Prévu plus tard : import de thèmes personnalisés depuis un dossier partagé (structure encore à définir) — `logbook-settings.json` n'enregistrera à terme que la référence du thème actif, pas son contenu.
 
+## Partage
+
+Un partage rend visible, à une personne précise, un sous-ensemble filtré des entrées (texte et mesures inclus), via un lien vers `partage.html?id=<fichierId>`.
+
+Le filtre (`regles`) associe chaque thème partagé à l'ensemble des niveaux d'accès visibles pour ce thème — le niveau est relatif au thème, pas un filtre global croisé (ex. `{ "Travail": ["N1","N2"], "Santé": ["N1"] }` partage les entrées Travail de niveau N1 ou N2, et seulement les entrées Santé de niveau N1). Une entrée est visible si au moins un de ses thèmes a une règle incluant son niveau (`filtrerEntreesPartage` dans `js/entries.js`).
+
+Côté stockage, un partage crée/maintient à jour (à chaque sauvegarde d'entrée) un fichier `partage-<uuid>.json` dans `Application/logbook/partages/`, et la configuration de tous les partages (nom, règles, emails invités, fichier associé) est dans `logbook-partages.json` à la racine de `Application/logbook`.
+
+Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtré via l'API Drive (`permissions.create`) — elle doit donc aussi être ajoutée en "Utilisateur test" du projet Google Cloud (même contrainte que pour le propriétaire, l'app étant en mode Test). Comme ce fichier n'est pas créé par sa propre session de l'app, le scope `drive.file` ne lui donne pas accès automatiquement : au premier chargement de `partage.html`, elle doit le sélectionner une fois via un sélecteur Google (Picker, `js/picker.js`), ce qui lui accorde l'accès à ce fichier précis sans élargir le scope du propriétaire ni le sien.
+
 ## État du projet
 
 - [x] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
@@ -56,4 +68,6 @@ Prévu plus tard : import de thèmes personnalisés depuis un dossier partagé (
 - [ ] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).
 - [x] Thème clair/sombre/appareil, par défaut proche de Notion, préférence stockée dans `logbook-settings.json`.
 - [ ] Import de thèmes personnalisés depuis un dossier partagé (structure à définir).
+- [x] Partage du tableau de bord par lien, filtré par thème et niveau d'accès (`partage.html`, accès invité via Google Picker).
+- [ ] Tester en conditions réelles (deux comptes Google distincts) le flux Picker + révocation d'un partage, une fois la clé API Picker configurée.
 - [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
