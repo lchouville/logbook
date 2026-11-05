@@ -248,6 +248,16 @@ form button[type="submit"] {
   flex: 1;
 }
 
+#partage-cancel {
+  margin-top: 1rem;
+  margin-left: 0.5rem;
+}
+
+.partage-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .ressenti-froid-form {
   display: flex;
   align-items: center;

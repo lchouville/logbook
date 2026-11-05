@@ -10,6 +10,7 @@ const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 const FOLDER_COLOR = '#cd74e6'; // Lavande (palette officielle Google Drive)
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
+const DRIVE_ABOUT_URL = 'https://www.googleapis.com/drive/v3/about';
 
 let folderIdCache = null;
 let partagesFolderIdCache = null;
@@ -183,17 +184,48 @@ export async function savePartages(partages) {
   return saveJsonFile(PARTAGES_FILE_NAME, partages, await getDataFolderId());
 }
 
-export async function saveSharedEntries(fileName, entries) {
-  return saveJsonFile(fileName, entries, await getPartagesFolderId());
+export async function createSharedFile(fileName, entries) {
+  return createFile(fileName, entries, await getPartagesFolderId());
+}
+
+export async function updateSharedFile(fileId, entries) {
+  return updateFile(fileId, entries);
+}
+
+export async function renameSharedFile(fileId, newName) {
+  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {
+    method: 'PATCH',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  });
+  if (!response.ok) throw new Error(`Renommage du fichier Drive : ${await describeError(response)}`);
+}
+
+export async function getOwnerDisplayName() {
+  const params = new URLSearchParams({ fields: 'user' });
+  const response = await fetch(`${DRIVE_ABOUT_URL}?${params}`, { headers: authHeaders() });
+  if (!response.ok) throw new Error(`Lecture du profil Drive : ${await describeError(response)}`);
+  const data = await response.json();
+  return data.user?.displayName ?? data.user?.emailAddress ?? null;
 }
 
 export async function shareFileWithEmail(fileId, email) {
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false`, {
+  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false&fields=id`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: 'reader', type: 'user', emailAddress: email }),
   });
   if (!response.ok) throw new Error(`Partage du fichier Drive : ${await describeError(response)}`);
+  const data = await response.json();
+  return data.id;
+}
+
+export async function revokePermission(fileId, permissionId) {
+  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions/${permissionId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(`Révocation de l'accès Drive : ${await describeError(response)}`);
 }
 
 export async function deleteSharedFile(fileId) {
