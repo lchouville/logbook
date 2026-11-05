@@ -6,8 +6,12 @@ import {
   saveSettings,
   loadPartages,
   savePartages,
-  saveSharedEntries,
+  createSharedFile,
+  updateSharedFile,
+  renameSharedFile,
+  getOwnerDisplayName,
   shareFileWithEmail,
+  revokePermission,
   deleteSharedFile,
 } from './drive.js';
 import {
@@ -43,12 +47,20 @@ const partageForm = document.getElementById('partage-form');
 const partageNom = document.getElementById('partage-nom');
 const partageEmail = document.getElementById('partage-email');
 const partageReglesFieldset = document.getElementById('partage-regles');
+const partageSubmit = document.getElementById('partage-submit');
+const partageCancel = document.getElementById('partage-cancel');
 const partageList = document.getElementById('partage-list');
 const partageError = document.getElementById('partage-error');
 
 let entries = [];
 let settings = {};
 let partages = [];
+let editingPartageId = null;
+let ownerName = null;
+
+function buildSharedFileName(nom) {
+  return `${(ownerName ?? 'Logbook').trim()} — ${nom.trim()}.json`;
+}
 
 themeSelect.addEventListener('change', async () => {
   settingsError.textContent = '';
@@ -178,6 +190,31 @@ function resetPartageRegles() {
   }
 }
 
+function applyPartageRegles(regles) {
+  for (const checkbox of partageReglesTable.querySelectorAll('input[type="checkbox"]')) {
+    const { theme, niveau } = checkbox.dataset;
+    checkbox.checked = Boolean(regles[theme]?.includes(niveau));
+  }
+}
+
+function startEditPartage(partage) {
+  editingPartageId = partage.id;
+  partageNom.value = partage.nom;
+  partageEmail.value = partage.emails[0] ?? '';
+  applyPartageRegles(partage.regles);
+  partageSubmit.textContent = 'Enregistrer les modifications';
+  partageCancel.hidden = false;
+  partageError.textContent = '';
+}
+
+function stopEditPartage() {
+  editingPartageId = null;
+  partageForm.reset();
+  resetPartageRegles();
+  partageSubmit.textContent = 'Créer le partage';
+  partageCancel.hidden = true;
+}
+
 function buildPartageLink(fichierId) {
   return new URL(`partage.html?id=${fichierId}`, window.location.href).toString();
 }
@@ -206,7 +243,7 @@ function renderEntries() {
 async function syncPartages() {
   for (const partage of partages) {
     try {
-      await saveSharedEntries(partage.fileName, filtrerEntreesPartage(entries, partage.regles));
+      await updateSharedFile(partage.fichierId, filtrerEntreesPartage(entries, partage.regles));
     } catch (error) {
       partageError.textContent = `Échec de la synchronisation d'un partage : ${error.message}`;
     }
@@ -215,6 +252,7 @@ async function syncPartages() {
 
 async function deletePartage(partage) {
   partageError.textContent = '';
+  if (editingPartageId === partage.id) stopEditPartage();
   const previousPartages = partages;
   partages = partages.filter((p) => p.id !== partage.id);
   renderPartages();
@@ -266,11 +304,22 @@ function renderPartages() {
     linkRow.append(linkInput, copyButton);
     li.appendChild(linkRow);
 
+    const actions = document.createElement('div');
+    actions.className = 'partage-actions';
+
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.textContent = 'Modifier';
+    editButton.addEventListener('click', () => startEditPartage(partage));
+    actions.appendChild(editButton);
+
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
     deleteButton.textContent = 'Supprimer';
     deleteButton.addEventListener('click', () => deletePartage(partage));
-    li.appendChild(deleteButton);
+    actions.appendChild(deleteButton);
+
+    li.appendChild(actions);
 
     partageList.appendChild(li);
   }
@@ -306,6 +355,8 @@ entryForm.addEventListener('submit', async (event) => {
   }
 });
 
+partageCancel.addEventListener('click', stopEditPartage);
+
 partageForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   partageError.textContent = '';
@@ -316,14 +367,51 @@ partageForm.addEventListener('submit', async (event) => {
   }
   const nom = partageNom.value.trim();
   const email = partageEmail.value.trim();
+
+  if (editingPartageId) {
+    const partage = partages.find((p) => p.id === editingPartageId);
+    try {
+      const filtered = filtrerEntreesPartage(entries, regles);
+      await updateSharedFile(partage.fichierId, filtered);
+      let fileName = partage.fileName;
+      if (nom !== partage.nom) {
+        fileName = buildSharedFileName(nom);
+        await renameSharedFile(partage.fichierId, fileName);
+      }
+      let permissionId = partage.permissionId;
+      if (email !== partage.emails[0]) {
+        if (permissionId) await revokePermission(partage.fichierId, permissionId);
+        permissionId = await shareFileWithEmail(partage.fichierId, email);
+      }
+      partages = partages.map((p) =>
+        p.id === editingPartageId ? { ...p, nom, regles, emails: [email], fileName, permissionId } : p,
+      );
+      await savePartages(partages);
+      renderPartages();
+      stopEditPartage();
+    } catch (error) {
+      partageError.textContent = `Échec de la modification du partage : ${error.message}`;
+    }
+    return;
+  }
+
   try {
-    const fileName = `partage-${crypto.randomUUID()}.json`;
+    const fileName = buildSharedFileName(nom);
     const filtered = filtrerEntreesPartage(entries, regles);
-    const fichierId = await saveSharedEntries(fileName, filtered);
-    await shareFileWithEmail(fichierId, email);
+    const fichierId = await createSharedFile(fileName, filtered);
+    const permissionId = await shareFileWithEmail(fichierId, email);
     partages = [
       ...partages,
-      { id: crypto.randomUUID(), nom, regles, emails: [email], fileName, fichierId, creeLe: new Date().toISOString() },
+      {
+        id: crypto.randomUUID(),
+        nom,
+        regles,
+        emails: [email],
+        fileName,
+        fichierId,
+        permissionId,
+        creeLe: new Date().toISOString(),
+      },
     ];
     await savePartages(partages);
     renderPartages();
@@ -366,10 +454,16 @@ onAuthChange(async (token) => {
       partages = [];
       partageError.textContent = `Échec du chargement des partages : ${error.message}`;
     }
+    try {
+      ownerName = await getOwnerDisplayName();
+    } catch {
+      ownerName = null;
+    }
   } else {
     entries = [];
     settings = {};
     partages = [];
+    ownerName = null;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
   }
