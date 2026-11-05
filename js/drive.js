@@ -7,7 +7,9 @@ const DATA_FILE_NAME = 'logbook-data.json';
 const SETTINGS_FILE_NAME = 'logbook-settings.json';
 const PARTAGES_FILE_NAME = 'logbook-partages.json';
 const PARTAGES_RECUS_FILE_NAME = 'logbook-partages-recus.json';
+const PARTAGES_RECUS_FOLDER_NAME = 'partages-recus';
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
+const SHORTCUT_MIME_TYPE = 'application/vnd.google-apps.shortcut';
 const FOLDER_COLOR = '#cd74e6'; // Lavande (palette officielle Google Drive)
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -15,6 +17,7 @@ const DRIVE_ABOUT_URL = 'https://www.googleapis.com/drive/v3/about';
 
 let folderIdCache = null;
 let partagesFolderIdCache = null;
+let partagesRecusFolderIdCache = null;
 const fileIdCache = new Map();
 
 function authHeaders() {
@@ -76,6 +79,13 @@ async function getPartagesFolderId() {
   const dataFolderId = await getDataFolderId();
   partagesFolderIdCache = await findOrCreateFolder(PARTAGES_FOLDER_NAME, dataFolderId);
   return partagesFolderIdCache;
+}
+
+async function getPartagesRecusFolderId() {
+  if (partagesRecusFolderIdCache) return partagesRecusFolderIdCache;
+  const dataFolderId = await getDataFolderId();
+  partagesRecusFolderIdCache = await findOrCreateFolder(PARTAGES_RECUS_FOLDER_NAME, dataFolderId);
+  return partagesRecusFolderIdCache;
 }
 
 async function migrateLegacyFile(folderId) {
@@ -249,6 +259,24 @@ export async function getSharedFileName(fileId) {
   if (!response.ok) throw new Error(`Lecture du nom du fichier partagé : ${await describeError(response)}`);
   const data = await response.json();
   return data.name;
+}
+
+export async function createPartageRecuShortcut(fileId, name) {
+  const folderId = await getPartagesRecusFolderId();
+  const metadata = {
+    name,
+    mimeType: SHORTCUT_MIME_TYPE,
+    parents: [folderId],
+    shortcutDetails: { targetId: fileId },
+  };
+  const response = await fetch(`${DRIVE_FILES_URL}?fields=id`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(metadata),
+  });
+  if (!response.ok) throw new Error(`Création du raccourci Drive : ${await describeError(response)}`);
+  const data = await response.json();
+  return data.id;
 }
 
 export async function loadPartagesRecus() {
