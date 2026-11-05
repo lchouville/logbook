@@ -68,7 +68,9 @@ Un partage existant peut être modifié (nom, règles, email) via le bouton "Mod
 
 Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtré via l'API Drive (`permissions.create`) — elle doit donc aussi être ajoutée en "Utilisateur test" du projet Google Cloud (même contrainte que pour le propriétaire, l'app étant en mode Test). Comme ce fichier n'est pas créé par sa propre session de l'app, le scope `drive.file` ne lui donne pas accès automatiquement : au premier chargement de `partage.html`, elle doit le sélectionner une fois via un sélecteur Google (Picker, `js/picker.js`), ce qui lui accorde l'accès à ce fichier précis sans élargir le scope du propriétaire ni le sien (le Picker nécessite `setAppId`, le numéro de projet Google Cloud — préfixe numérique du Client ID — sans quoi l'autorisation ne s'enregistre pas et l'API Drive continue de renvoyer 403 après la sélection).
 
-Une fois un partage accepté (fichier lu avec succès, directement ou après le Picker), il est enregistré dans `logbook-partages-recus.json` (propre Drive de la personne invitée, même dossier `Application/logbook`) avec le nom du fichier Drive comme libellé. La section "Partages reçus" d'`index.html` liste ces partages (lien vers `partage.html?id=<fichierId>`, bouton "Retirer" qui ne fait que les enlever de cette liste locale — n'affecte ni le partage ni l'accès côté propriétaire).
+Une fois un partage accepté (fichier lu avec succès, directement ou après le Picker), il est enregistré dans `logbook-partages-recus.json` (propre Drive de la personne invitée, même dossier `Application/logbook`) avec le nom du fichier Drive comme libellé — **à vérifier avec le même compte Google que celui utilisé sur `partage.html`**, sinon la liste est simplement vide (chacune des deux pages lit le Drive du compte qui y est connecté). La section "Partages reçus" d'`index.html` liste ces partages (lien vers `partage.html?id=<fichierId>`, bouton "Retirer" qui ne fait que les enlever de cette liste locale — n'affecte ni le partage ni l'accès côté propriétaire).
+
+Un raccourci Drive (`shortcutDetails`, pas de copie du fichier) est aussi créé dans `Application/logbook/partages-recus/` du Drive de la personne invitée, pointant vers le fichier partagé — visible directement dans son Google Drive, pas seulement dans l'app.
 
 ## Connexion
 
@@ -85,7 +87,8 @@ Le flux OAuth implicite de Google (`initTokenClient`, utilisé ici) ne délivre 
 - [x] Thème clair/sombre/appareil, par défaut proche de Notion, préférence stockée dans `logbook-settings.json`.
 - [ ] Import de thèmes personnalisés depuis un dossier partagé (structure à définir).
 - [x] Partage du tableau de bord par lien, filtré par thème et niveau d'accès (`partage.html`, accès invité via Google Picker).
-- [ ] Tester en conditions réelles (deux comptes Google distincts) le flux Picker + révocation d'un partage, une fois la clé API Picker configurée (correctif `setAppId` appliqué, pas encore reconfirmé par un nouveau test croisé).
+- [x] Tester en conditions réelles (deux comptes Google distincts) le flux Picker — confirmé fonctionnel après le correctif `setAppId`.
+- [x] Créer un raccourci Drive (`Application/logbook/partages-recus/`) vers chaque partage accepté, dans le Drive de la personne invitée.
 - [x] Modifier un partage existant (nom, règles, email).
 - [x] Sortir `js/config.js` de Git (généré à la publication depuis des secrets GitHub Actions, `js/config.template.js` commité à la place).
 - [x] Basculer la source de GitHub Pages sur "GitHub Actions" et renseigner les secrets `GOOGLE_CLIENT_ID`/`GOOGLE_PICKER_API_KEY` du dépôt.

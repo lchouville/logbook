@@ -1,5 +1,11 @@
 import { onAuthChange, signIn, signOut, getAccessToken } from './auth.js';
-import { loadSharedFile, getSharedFileName, loadPartagesRecus, savePartagesRecus } from './drive.js';
+import {
+  loadSharedFile,
+  getSharedFileName,
+  loadPartagesRecus,
+  savePartagesRecus,
+  createPartageRecuShortcut,
+} from './drive.js';
 import { pickSharedFile } from './picker.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
 
@@ -52,6 +58,11 @@ async function recordPartageRecu() {
     const recus = await loadPartagesRecus();
     if (recus.some((p) => p.fichierId === fileId)) return;
     const nom = await getSharedFileName(fileId);
+    try {
+      await createPartageRecuShortcut(fileId, nom);
+    } catch {
+      // Best-effort : le raccourci Drive est un confort, pas une nécessité.
+    }
     await savePartagesRecus([
       ...recus,
       { id: crypto.randomUUID(), fichierId: fileId, nom, premierAccesLe: new Date().toISOString() },
