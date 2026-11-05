@@ -6,6 +6,7 @@ const PARTAGES_FOLDER_NAME = 'partages';
 const DATA_FILE_NAME = 'logbook-data.json';
 const SETTINGS_FILE_NAME = 'logbook-settings.json';
 const PARTAGES_FILE_NAME = 'logbook-partages.json';
+const PARTAGES_RECUS_FILE_NAME = 'logbook-partages-recus.json';
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 const FOLDER_COLOR = '#cd74e6'; // Lavande (palette officielle Google Drive)
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
@@ -240,4 +241,20 @@ export async function loadSharedFile(fileId) {
   const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, { headers: authHeaders() });
   if (!response.ok) throw new Error(`Lecture du fichier partagé : ${await describeError(response)}`);
   return response.json();
+}
+
+export async function getSharedFileName(fileId) {
+  const params = new URLSearchParams({ fields: 'name' });
+  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?${params}`, { headers: authHeaders() });
+  if (!response.ok) throw new Error(`Lecture du nom du fichier partagé : ${await describeError(response)}`);
+  const data = await response.json();
+  return data.name;
+}
+
+export async function loadPartagesRecus() {
+  return loadJsonFile(PARTAGES_RECUS_FILE_NAME, [], await getDataFolderId());
+}
+
+export async function savePartagesRecus(partagesRecus) {
+  return saveJsonFile(PARTAGES_RECUS_FILE_NAME, partagesRecus, await getDataFolderId());
 }
