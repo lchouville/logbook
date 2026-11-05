@@ -19,13 +19,19 @@
     <button id="sidebar-toggle" type="button" aria-label="Ouvrir/fermer le menu">☰</button>
     <nav id="sidebar">
       <div id="sidebar-profile">
-        <span id="sidebar-owner-name"></span>
-        <button id="sidebar-settings-button" type="button" aria-label="Paramètres">⚙</button>
+        <button id="sidebar-profile-button" type="button" aria-haspopup="true" aria-expanded="false">
+          <span id="sidebar-owner-avatar" aria-hidden="true"></span>
+          <span id="sidebar-owner-name"></span>
+          <span id="sidebar-profile-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div id="sidebar-profile-menu" hidden>
+          <button id="sidebar-settings-button" type="button">Paramètres</button>
+          <button id="sign-out" type="button">Se déconnecter</button>
+        </div>
       </div>
       <ul id="sidebar-journaux"></ul>
       <button id="sidebar-journaux-plus" type="button" hidden>Voir tout</button>
       <button id="sidebar-partage-button" type="button">Partage</button>
-      <button id="sign-out" type="button">Se déconnecter</button>
     </nav>
     <main id="main-content">
       <section id="entries">
