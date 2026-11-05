@@ -1,10 +1,14 @@
 import { onAuthChange, signIn, signOut } from './auth.js';
-import { loadEntries, saveEntries } from './drive.js';
+import { loadEntries, saveEntries, loadSettings, saveSettings } from './drive.js';
 import { createEntry, NIVEAUX_ACCES, STATUTS, THEMES, TYPES_JOURNEE } from './entries.js';
+import { applyTheme, DEFAULT_THEME } from './theme.js';
 
 const signInButton = document.getElementById('sign-in');
 const signOutButton = document.getElementById('sign-out');
 const authStatus = document.getElementById('auth-status');
+const settingsSection = document.getElementById('settings');
+const themeSelect = document.getElementById('theme-select');
+const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const entryForm = document.getElementById('entry-form');
 const entryThemes = document.getElementById('entry-themes');
@@ -18,6 +22,23 @@ const entryList = document.getElementById('entry-list');
 const entryError = document.getElementById('entry-error');
 
 let entries = [];
+let settings = {};
+
+themeSelect.addEventListener('change', async () => {
+  settingsError.textContent = '';
+  const previousTheme = settings.theme ?? DEFAULT_THEME;
+  const theme = themeSelect.value;
+  applyTheme(theme);
+  settings = { ...settings, theme };
+  try {
+    await saveSettings(settings);
+  } catch (error) {
+    settings = { ...settings, theme: previousTheme };
+    themeSelect.value = previousTheme;
+    applyTheme(previousTheme);
+    settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
 
 function populateSelect(select, options) {
   for (const option of options) {
@@ -75,10 +96,20 @@ onAuthChange(async (token) => {
   const connected = Boolean(token);
   signInButton.hidden = connected;
   signOutButton.hidden = !connected;
+  settingsSection.hidden = !connected;
   entriesSection.hidden = !connected;
   authStatus.textContent = connected ? 'Connecté à Google Drive.' : 'Non connecté.';
   entryError.textContent = '';
+  settingsError.textContent = '';
   if (connected) {
+    try {
+      settings = await loadSettings();
+    } catch (error) {
+      settings = {};
+      settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+    }
+    themeSelect.value = settings.theme ?? DEFAULT_THEME;
+    applyTheme(settings.theme ?? DEFAULT_THEME);
     try {
       entries = await loadEntries();
     } catch (error) {
@@ -87,6 +118,9 @@ onAuthChange(async (token) => {
     }
   } else {
     entries = [];
+    settings = {};
+    themeSelect.value = DEFAULT_THEME;
+    applyTheme(DEFAULT_THEME);
   }
   renderEntries();
 });

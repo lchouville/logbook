@@ -38,6 +38,14 @@ Projet Google Cloud : `logbook-513714`. Client OAuth Web "Logbook Web" créé, o
 
 Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dans le dossier `Application/logbook` du Drive de l'utilisateur (créés automatiquement au premier enregistrement si absents, en couleur Lavande `#CD74E6`). `js/drive.js` gère ça avec le scope `drive.file` — l'app ne voit que les fichiers/dossiers qu'elle crée elle-même. Si un ancien `logbook-data.json` traîne à la racine du Drive (créé avant l'introduction de ce dossier), il est automatiquement déplacé dans `Application/logbook` au lieu d'être dupliqué. Modèle d'une entrée (`js/entries.js`) : thème(s), niveau d'accès (N1-N5), statut (A Valider / A Compléter / Complete / Bilan), type de journée, mesures du soir (énergie, ressenti /10), texte, et un `ressentiAFroid` rempli plus tard (pas encore d'UI dédiée).
 
+Les préférences utilisateur (thème pour l'instant) sont stockées dans un second fichier JSON, `logbook-settings.json`, dans le même dossier `Application/logbook`. `js/drive.js` expose `loadSettings`/`saveSettings` en généralisant la logique de lecture/écriture déjà utilisée pour `logbook-data.json`.
+
+## Thème
+
+Le thème par défaut s'inspire visuellement de Notion (typo système, bordures fines, cartes sobres). Trois réglages possibles, choisis via le sélecteur "Thème" une fois connecté : Clair, Sombre, Appareil (suit `prefers-color-scheme`, c'est la valeur par défaut). Le réglage est stocké dans `logbook-settings.json` (`{ "theme": "device" | "light" | "dark" }`) et appliqué via l'attribut `data-theme` sur `<html>`, lu par les variables CSS définies dans `css/style.css` (`js/theme.js` pour la logique d'application).
+
+Prévu plus tard : import de thèmes personnalisés depuis un dossier partagé (structure encore à définir) — `logbook-settings.json` n'enregistrera à terme que la référence du thème actif, pas son contenu.
+
 ## État du projet
 
 - [x] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
@@ -46,4 +54,6 @@ Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dan
 - [x] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
 - [x] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
 - [ ] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).
+- [x] Thème clair/sombre/appareil, par défaut proche de Notion, préférence stockée dans `logbook-settings.json`.
+- [ ] Import de thèmes personnalisés depuis un dossier partagé (structure à définir).
 - [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
