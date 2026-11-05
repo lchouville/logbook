@@ -1,6 +1,6 @@
 import { onAuthChange, signIn, signOut } from './auth.js';
 import { loadEntries, saveEntries } from './drive.js';
-import { createEntry, NIVEAUX_ACCES, STATUTS, THEMES, TYPES_JOURNEE } from './entries.js';
+import { createEntry, peutRemplirRessentiAFroid, NIVEAUX_ACCES, STATUTS, THEMES, TYPES_JOURNEE } from './entries.js';
 
 const signInButton = document.getElementById('sign-in');
 const signOutButton = document.getElementById('sign-out');
@@ -33,11 +33,70 @@ populateSelect(entryNiveau, NIVEAUX_ACCES);
 populateSelect(entryStatut, STATUTS);
 populateSelect(entryTypeJournee, TYPES_JOURNEE);
 
+function buildRessentiAFroidForm(entry) {
+  const form = document.createElement('form');
+  form.className = 'ressenti-froid-form';
+
+  const inputId = `ressenti-froid-${entry.id}`;
+  const label = document.createElement('label');
+  label.setAttribute('for', inputId);
+  label.textContent = 'Ressenti à froid (0-10)';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.id = inputId;
+  input.min = '0';
+  input.max = '10';
+  input.step = '0.5';
+  input.required = true;
+
+  const button = document.createElement('button');
+  button.type = 'submit';
+  button.textContent = 'Enregistrer';
+
+  const error = document.createElement('p');
+  error.className = 'entry-error';
+  error.setAttribute('role', 'alert');
+
+  form.append(label, input, button, error);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    error.textContent = '';
+    const valeur = input.valueAsNumber;
+    const previousEntries = entries;
+    entries = entries.map((e) => (e.id === entry.id ? { ...e, ressentiAFroid: valeur } : e));
+    try {
+      await saveEntries(entries);
+      renderEntries();
+    } catch (err) {
+      entries = previousEntries;
+      error.textContent = `Échec de l'enregistrement : ${err.message}`;
+    }
+  });
+
+  return form;
+}
+
 function renderEntries() {
   entryList.innerHTML = '';
   for (const entry of [...entries].reverse()) {
     const li = document.createElement('li');
-    li.textContent = `${entry.date} — ${entry.themes.join(', ')} (${entry.niveauAcces}, ${entry.statut})`;
+    li.className = 'entry';
+
+    const summary = document.createElement('p');
+    summary.textContent = `${entry.date} — ${entry.themes.join(', ')} (${entry.niveauAcces}, ${entry.statut})`;
+    li.appendChild(summary);
+
+    if (entry.ressentiAFroid != null) {
+      const froid = document.createElement('p');
+      froid.className = 'entry-ressenti-froid';
+      froid.textContent = `Ressenti à froid : ${entry.ressentiAFroid}/10`;
+      li.appendChild(froid);
+    } else if (peutRemplirRessentiAFroid(entry)) {
+      li.appendChild(buildRessentiAFroidForm(entry));
+    }
+
     entryList.appendChild(li);
   }
 }

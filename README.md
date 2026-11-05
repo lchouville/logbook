@@ -45,5 +45,5 @@ Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dan
 - [x] Activer GitHub Pages sur la branche `gh-page`.
 - [x] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
 - [x] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
-- [ ] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).
+- [x] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).
 - [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
