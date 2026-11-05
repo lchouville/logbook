@@ -50,6 +50,34 @@ Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dan
 
 Les préférences utilisateur (thème pour l'instant) sont stockées dans un second fichier JSON, `logbook-settings.json`, dans le même dossier `Application/logbook`. `js/drive.js` expose `loadSettings`/`saveSettings` en généralisant la logique de lecture/écriture déjà utilisée pour `logbook-data.json`.
 
+## Navigation
+
+`index.html` est le shell applicatif unique : une sidebar rétractable (burger sur
+mobile comme sur desktop, bouton `#sidebar-toggle`, état persisté dans
+`localStorage` via `js/sidebar.js`) + une zone de contenu principale qui bascule
+sans rechargement entre "mon journal" (`#entries`) et un journal partagé en
+lecture seule (`#journal-partage`, logique dans `js/viewer.js`, ex-`partage.js`).
+La sidebar liste "Mon journal de bord" puis les 4 partages reçus les plus
+récemment ouverts (triés par `dernierAccesLe` dans `logbook-partages-recus.json`,
+mis à jour à chaque affichage, pas seulement au premier), avec un bouton
+"Voir tout" vers la modale Accès pour la liste complète. Les pages Paramètres et
+Partage (gérer mes partages) sont des modales (`js/modal.js`, simple
+show/hide des sections `#settings`/`#partages`/`#partages-recus` dans un
+panneau unique, pas de nouvelle page).
+
+Le lien d'un journal partagé est maintenant `index.html?journal=<fichierId>`
+(géré via `history.pushState`/`popstate`, pas de rechargement en cliquant
+depuis la sidebar). `partage.html?id=<fichierId>` reste en place comme
+redirection légère (`location.replace`) vers cette nouvelle URL, pour ne pas
+casser les liens déjà envoyés avant ce changement.
+
+**Piège CSS à retenir** : un élément avec son propre `display: flex` (ou autre)
+sur un sélecteur `#id` a une spécificité plus forte que la règle `[hidden] {
+display: none }` du navigateur — l'attribut `hidden` se fait silencieusement
+ignorer. D'où la règle globale `[hidden] { display: none !important; }` tout en
+haut de `css/style.css`, qui garantit que `hidden` gagne toujours, quel que soit
+le `display` déclaré par ailleurs sur cet élément.
+
 ## Thème
 
 Le thème par défaut s'inspire visuellement de Notion (typo système, bordures fines, cartes sobres). Trois réglages possibles, choisis via le sélecteur "Thème" une fois connecté : Clair, Sombre, Appareil (suit `prefers-color-scheme`, c'est la valeur par défaut). Le réglage est stocké dans `logbook-settings.json` (`{ "theme": "device" | "light" | "dark" }`) et appliqué via l'attribut `data-theme` sur `<html>`, lu par les variables CSS définies dans `css/style.css` (`js/theme.js` pour la logique d'application).
@@ -58,7 +86,7 @@ Prévu plus tard : import de thèmes personnalisés depuis un dossier partagé (
 
 ## Partage
 
-Un partage rend visible, à une personne précise, un sous-ensemble filtré des entrées (texte et mesures inclus), via un lien vers `partage.html?id=<fichierId>`.
+Un partage rend visible, à une personne précise, un sous-ensemble filtré des entrées (texte et mesures inclus), via un lien vers `index.html?journal=<fichierId>` (voir "Navigation" ci-dessus).
 
 Le filtre (`regles`) associe chaque thème partagé à l'ensemble des niveaux d'accès visibles pour ce thème — le niveau est relatif au thème, pas un filtre global croisé (ex. `{ "Travail": ["N1","N2"], "Santé": ["N1"] }` partage les entrées Travail de niveau N1 ou N2, et seulement les entrées Santé de niveau N1). Une entrée est visible si au moins un de ses thèmes a une règle incluant son niveau (`filtrerEntreesPartage` dans `js/entries.js`).
 
@@ -66,9 +94,9 @@ Côté stockage, un partage crée/maintient à jour (à chaque sauvegarde d'entr
 
 Un partage existant peut être modifié (nom, règles, email) via le bouton "Modifier" — rechange le fichier Drive si le nom change, et ne révoque/recrée la permission Drive que si l'email change.
 
-Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtré via l'API Drive (`permissions.create`) — elle doit donc aussi être ajoutée en "Utilisateur test" du projet Google Cloud (même contrainte que pour le propriétaire, l'app étant en mode Test). Comme ce fichier n'est pas créé par sa propre session de l'app, le scope `drive.file` ne lui donne pas accès automatiquement : au premier chargement de `partage.html`, elle doit le sélectionner une fois via un sélecteur Google (Picker, `js/picker.js`), ce qui lui accorde l'accès à ce fichier précis sans élargir le scope du propriétaire ni le sien (le Picker nécessite `setAppId`, le numéro de projet Google Cloud — préfixe numérique du Client ID — sans quoi l'autorisation ne s'enregistre pas et l'API Drive continue de renvoyer 403 après la sélection).
+Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtré via l'API Drive (`permissions.create`) — elle doit donc aussi être ajoutée en "Utilisateur test" du projet Google Cloud (même contrainte que pour le propriétaire, l'app étant en mode Test). Comme ce fichier n'est pas créé par sa propre session de l'app, le scope `drive.file` ne lui donne pas accès automatiquement : au premier chargement du journal partagé (`?journal=<fichierId>`), elle doit le sélectionner une fois via un sélecteur Google (Picker, `js/picker.js`), ce qui lui accorde l'accès à ce fichier précis sans élargir le scope du propriétaire ni le sien (le Picker nécessite `setAppId`, le numéro de projet Google Cloud — préfixe numérique du Client ID — sans quoi l'autorisation ne s'enregistre pas et l'API Drive continue de renvoyer 403 après la sélection).
 
-Une fois un partage accepté (fichier lu avec succès, directement ou après le Picker), il est enregistré dans `logbook-partages-recus.json` (propre Drive de la personne invitée, même dossier `Application/logbook`) avec le nom du fichier Drive comme libellé — **à vérifier avec le même compte Google que celui utilisé sur `partage.html`**, sinon la liste est simplement vide (chacune des deux pages lit le Drive du compte qui y est connecté). La section "Partages reçus" d'`index.html` liste ces partages (lien vers `partage.html?id=<fichierId>`, bouton "Retirer" qui ne fait que les enlever de cette liste locale — n'affecte ni le partage ni l'accès côté propriétaire).
+Une fois un partage accepté (fichier lu avec succès, directement ou après le Picker), il est enregistré dans `logbook-partages-recus.json` (propre Drive de la personne invitée, même dossier `Application/logbook`) avec le nom du fichier Drive comme libellé — **à vérifier avec le même compte Google partout**, sinon la liste est simplement vide (l'app lit toujours le Drive du compte actuellement connecté). La modale Accès (voir "Navigation") liste ces partages (bouton "Voir" → bascule sur ce journal sans rechargement, bouton "Retirer" qui ne fait que les enlever de cette liste locale — n'affecte ni le partage ni l'accès côté propriétaire).
 
 Un raccourci Drive (`shortcutDetails`, pas de copie du fichier) est aussi créé dans `Application/logbook/partages-recus/` du Drive de la personne invitée, pointant vers le fichier partagé — visible directement dans son Google Drive, pas seulement dans l'app.
 
@@ -95,3 +123,4 @@ Le flux OAuth implicite de Google (`initTokenClient`, utilisé ici) ne délivre 
 - [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
 - [x] Reconnexion silencieuse (sans réafficher l'écran de consentement à chaque nouvel onglet, tant que l'utilisateur ne s'est pas déconnecté explicitement).
 - [x] Voir, depuis son propre compte, les tableaux de bord partagés avec soi ("Partages reçus" dans `index.html`).
+- [x] Sidebar rétractable (profil, journaux accessibles, accès à Partage/Paramètres) et navigation inline entre journaux sans rechargement.

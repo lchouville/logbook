@@ -48,18 +48,20 @@
   box-sizing: border-box;
 }
 
+/* Guarantees the hidden attribute always wins over any element's own
+   `display` rule (several here use flex), regardless of selector specificity. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
-  display: flex;
-  justify-content: center;
   background: var(--color-bg);
   color: var(--color-fg);
 }
 
-#app {
-  width: 100%;
-  max-width: 40rem;
-  padding: 2rem 1rem;
+a {
+  color: var(--color-accent);
 }
 
 h1 {
@@ -156,9 +158,15 @@ form button[type="submit"] {
 }
 
 #auth {
+  max-width: 40rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 #auth p {
@@ -168,16 +176,13 @@ form button[type="submit"] {
 #settings {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 #settings h2 {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  width: 100%;
+  margin: 0 0 0.5rem;
 }
 
 #settings label {
@@ -259,19 +264,6 @@ form button[type="submit"] {
   gap: 0.5rem;
 }
 
-.partage-actions a {
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-secondary);
-  color: var(--color-fg);
-  text-decoration: none;
-}
-
-.partage-actions a:hover {
-  background: var(--color-bg-hover);
-}
-
 .ressenti-froid-form {
   display: flex;
   align-items: center;
@@ -293,13 +285,165 @@ form button[type="submit"] {
   min-height: 1.25rem;
 }
 
-footer {
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border);
-  font-size: 0.8125rem;
+/* App shell (sidebar + main content) */
+
+#app-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
 }
 
-footer a {
-  color: var(--color-fg-secondary);
+#sidebar-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+}
+
+#sidebar {
+  width: 16rem;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  overflow-y: auto;
+  padding: 4rem 1rem 1rem;
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+  transform: translateX(0);
+  transition: transform 0.2s ease;
+  z-index: 15;
+}
+
+#sidebar.collapsed {
+  transform: translateX(-100%);
+}
+
+#sidebar-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+#sidebar-owner-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sidebar-journaux {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+#sidebar-journaux button,
+#sidebar-journaux-plus,
+#sidebar-partage-button,
+#sign-out {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+}
+
+#sidebar-journaux button:hover,
+#sidebar-journaux-plus:hover,
+#sidebar-partage-button:hover,
+#sign-out:hover {
+  background: var(--color-bg-hover);
+}
+
+#sidebar-journaux button[aria-current="true"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+#sidebar-journaux-plus,
+#sidebar-partage-button,
+#sign-out {
+  margin-top: 0.5rem;
+}
+
+#main-content {
+  flex: 1;
+  margin-left: 16rem;
+  padding: 2rem 1.5rem;
+  max-width: 40rem;
+  box-sizing: border-box;
+  transition: margin-left 0.2s ease;
+}
+
+#sidebar.collapsed ~ #main-content {
+  margin-left: 0;
+}
+
+#main-content section {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+@media (max-width: 768px) {
+  #sidebar {
+    width: 85vw;
+    max-width: 18rem;
+  }
+
+  #main-content {
+    margin-left: 0;
+  }
+}
+
+/* Modales */
+
+#modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+#modal-panel {
+  position: relative;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 1.5rem;
+  width: calc(100% - 2rem);
+  max-width: 32rem;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+#modal-panel section {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+#modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
 }
