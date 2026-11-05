@@ -16,6 +16,16 @@
       <button id="sign-out" type="button" hidden>Se déconnecter</button>
       <p id="auth-status">Non connecté.</p>
     </section>
+    <section id="settings" hidden>
+      <h2>Préférences</h2>
+      <label for="theme-select">Thème</label>
+      <select id="theme-select">
+        <option value="device">Appareil</option>
+        <option value="light">Clair</option>
+        <option value="dark">Sombre</option>
+      </select>
+      <p id="settings-error" role="alert"></p>
+    </section>
     <section id="entries" hidden>
       <h2>Nouvelle entrée</h2>
       <form id="entry-form">
