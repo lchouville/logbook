@@ -1,10 +1,32 @@
 import { onAuthChange, signIn, signOut } from './auth.js';
-import { loadEntries, saveEntries } from './drive.js';
-import { createEntry, peutRemplirRessentiAFroid, NIVEAUX_ACCES, STATUTS, THEMES, TYPES_JOURNEE } from './entries.js';
+import {
+  loadEntries,
+  saveEntries,
+  loadSettings,
+  saveSettings,
+  loadPartages,
+  savePartages,
+  saveSharedEntries,
+  shareFileWithEmail,
+  deleteSharedFile,
+} from './drive.js';
+import {
+  createEntry,
+  peutRemplirRessentiAFroid,
+  filtrerEntreesPartage,
+  NIVEAUX_ACCES,
+  STATUTS,
+  THEMES,
+  TYPES_JOURNEE,
+} from './entries.js';
+import { applyTheme, DEFAULT_THEME } from './theme.js';
 
 const signInButton = document.getElementById('sign-in');
 const signOutButton = document.getElementById('sign-out');
 const authStatus = document.getElementById('auth-status');
+const settingsSection = document.getElementById('settings');
+const themeSelect = document.getElementById('theme-select');
+const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const entryForm = document.getElementById('entry-form');
 const entryThemes = document.getElementById('entry-themes');
@@ -16,8 +38,33 @@ const entryRessenti = document.getElementById('entry-ressenti');
 const entryTexte = document.getElementById('entry-texte');
 const entryList = document.getElementById('entry-list');
 const entryError = document.getElementById('entry-error');
+const partagesSection = document.getElementById('partages');
+const partageForm = document.getElementById('partage-form');
+const partageNom = document.getElementById('partage-nom');
+const partageEmail = document.getElementById('partage-email');
+const partageReglesFieldset = document.getElementById('partage-regles');
+const partageList = document.getElementById('partage-list');
+const partageError = document.getElementById('partage-error');
 
 let entries = [];
+let settings = {};
+let partages = [];
+
+themeSelect.addEventListener('change', async () => {
+  settingsError.textContent = '';
+  const previousTheme = settings.theme ?? DEFAULT_THEME;
+  const theme = themeSelect.value;
+  applyTheme(theme);
+  settings = { ...settings, theme };
+  try {
+    await saveSettings(settings);
+  } catch (error) {
+    settings = { ...settings, theme: previousTheme };
+    themeSelect.value = previousTheme;
+    applyTheme(previousTheme);
+    settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
 
 function populateSelect(select, options) {
   for (const option of options) {
@@ -78,11 +125,67 @@ function buildRessentiAFroidForm(entry) {
   return form;
 }
 
+function buildPartageReglesTable() {
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  headRow.appendChild(document.createElement('th'));
+  for (const niveau of NIVEAUX_ACCES) {
+    const th = document.createElement('th');
+    th.textContent = niveau;
+    headRow.appendChild(th);
+  }
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  for (const theme of THEMES) {
+    const row = document.createElement('tr');
+    const th = document.createElement('th');
+    th.scope = 'row';
+    th.textContent = theme;
+    row.appendChild(th);
+    for (const niveau of NIVEAUX_ACCES) {
+      const td = document.createElement('td');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.theme = theme;
+      checkbox.dataset.niveau = niveau;
+      td.appendChild(checkbox);
+      row.appendChild(td);
+    }
+    tbody.appendChild(row);
+  }
+  table.appendChild(tbody);
+  partageReglesFieldset.appendChild(table);
+  return table;
+}
+
+const partageReglesTable = buildPartageReglesTable();
+
+function readPartageRegles() {
+  const regles = {};
+  for (const checkbox of partageReglesTable.querySelectorAll('input[type="checkbox"]:checked')) {
+    const { theme, niveau } = checkbox.dataset;
+    regles[theme] = regles[theme] ? [...regles[theme], niveau] : [niveau];
+  }
+  return regles;
+}
+
+function resetPartageRegles() {
+  for (const checkbox of partageReglesTable.querySelectorAll('input[type="checkbox"]')) {
+    checkbox.checked = false;
+  }
+}
+
+function buildPartageLink(fichierId) {
+  return new URL(`partage.html?id=${fichierId}`, window.location.href).toString();
+}
+
 function renderEntries() {
   entryList.innerHTML = '';
   for (const entry of [...entries].reverse()) {
     const li = document.createElement('li');
-    li.className = 'entry';
 
     const summary = document.createElement('p');
     summary.textContent = `${entry.date} — ${entry.themes.join(', ')} (${entry.niveauAcces}, ${entry.statut})`;
@@ -90,7 +193,6 @@ function renderEntries() {
 
     if (entry.ressentiAFroid != null) {
       const froid = document.createElement('p');
-      froid.className = 'entry-ressenti-froid';
       froid.textContent = `Ressenti à froid : ${entry.ressentiAFroid}/10`;
       li.appendChild(froid);
     } else if (peutRemplirRessentiAFroid(entry)) {
@@ -98,6 +200,79 @@ function renderEntries() {
     }
 
     entryList.appendChild(li);
+  }
+}
+
+async function syncPartages() {
+  for (const partage of partages) {
+    try {
+      await saveSharedEntries(partage.fileName, filtrerEntreesPartage(entries, partage.regles));
+    } catch (error) {
+      partageError.textContent = `Échec de la synchronisation d'un partage : ${error.message}`;
+    }
+  }
+}
+
+async function deletePartage(partage) {
+  partageError.textContent = '';
+  const previousPartages = partages;
+  partages = partages.filter((p) => p.id !== partage.id);
+  renderPartages();
+  try {
+    await deleteSharedFile(partage.fichierId);
+    await savePartages(partages);
+  } catch (error) {
+    partages = previousPartages;
+    partageError.textContent = `Échec de la suppression : ${error.message}`;
+    renderPartages();
+  }
+}
+
+function renderPartages() {
+  partageList.innerHTML = '';
+  for (const partage of partages) {
+    const li = document.createElement('li');
+
+    const titre = document.createElement('p');
+    titre.textContent = partage.nom;
+    li.appendChild(titre);
+
+    const regles = document.createElement('p');
+    regles.textContent = Object.entries(partage.regles)
+      .map(([theme, niveaux]) => `${theme} (${niveaux.join(', ')})`)
+      .join(' · ');
+    li.appendChild(regles);
+
+    const email = document.createElement('p');
+    email.textContent = partage.emails.join(', ');
+    li.appendChild(email);
+
+    const linkRow = document.createElement('div');
+    linkRow.className = 'partage-link';
+    const linkInput = document.createElement('input');
+    linkInput.type = 'text';
+    linkInput.readOnly = true;
+    linkInput.value = buildPartageLink(partage.fichierId);
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.textContent = 'Copier le lien';
+    copyButton.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(linkInput.value);
+      copyButton.textContent = 'Copié !';
+      setTimeout(() => {
+        copyButton.textContent = 'Copier le lien';
+      }, 1500);
+    });
+    linkRow.append(linkInput, copyButton);
+    li.appendChild(linkRow);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Supprimer';
+    deleteButton.addEventListener('click', () => deletePartage(partage));
+    li.appendChild(deleteButton);
+
+    partageList.appendChild(li);
   }
 }
 
@@ -122,6 +297,7 @@ entryForm.addEventListener('submit', async (event) => {
   entries = [...entries, entry];
   try {
     await saveEntries(entries);
+    await syncPartages();
     renderEntries();
     entryForm.reset();
   } catch (error) {
@@ -130,22 +306,73 @@ entryForm.addEventListener('submit', async (event) => {
   }
 });
 
+partageForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  partageError.textContent = '';
+  const regles = readPartageRegles();
+  if (Object.keys(regles).length === 0) {
+    partageError.textContent = 'Coche au moins un niveau pour un thème.';
+    return;
+  }
+  const nom = partageNom.value.trim();
+  const email = partageEmail.value.trim();
+  try {
+    const fileName = `partage-${crypto.randomUUID()}.json`;
+    const filtered = filtrerEntreesPartage(entries, regles);
+    const fichierId = await saveSharedEntries(fileName, filtered);
+    await shareFileWithEmail(fichierId, email);
+    partages = [
+      ...partages,
+      { id: crypto.randomUUID(), nom, regles, emails: [email], fileName, fichierId, creeLe: new Date().toISOString() },
+    ];
+    await savePartages(partages);
+    renderPartages();
+    partageForm.reset();
+    resetPartageRegles();
+  } catch (error) {
+    partageError.textContent = `Échec de la création du partage : ${error.message}`;
+  }
+});
+
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   signInButton.hidden = connected;
   signOutButton.hidden = !connected;
+  settingsSection.hidden = !connected;
   entriesSection.hidden = !connected;
+  partagesSection.hidden = !connected;
   authStatus.textContent = connected ? 'Connecté à Google Drive.' : 'Non connecté.';
   entryError.textContent = '';
+  settingsError.textContent = '';
+  partageError.textContent = '';
   if (connected) {
+    try {
+      settings = await loadSettings();
+    } catch (error) {
+      settings = {};
+      settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+    }
+    themeSelect.value = settings.theme ?? DEFAULT_THEME;
+    applyTheme(settings.theme ?? DEFAULT_THEME);
     try {
       entries = await loadEntries();
     } catch (error) {
       entries = [];
       entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
     }
+    try {
+      partages = await loadPartages();
+    } catch (error) {
+      partages = [];
+      partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+    }
   } else {
     entries = [];
+    settings = {};
+    partages = [];
+    themeSelect.value = DEFAULT_THEME;
+    applyTheme(DEFAULT_THEME);
   }
   renderEntries();
+  renderPartages();
 });

@@ -25,3 +25,7 @@ export function peutRemplirRessentiAFroid(entry, maintenant = new Date()) {
   seuil.setDate(seuil.getDate() + DELAI_RESSENTI_A_FROID_JOURS);
   return maintenant >= seuil;
 }
+
+export function filtrerEntreesPartage(entries, regles) {
+  return entries.filter((entry) => entry.themes.some((theme) => regles[theme]?.includes(entry.niveauAcces)));
+}
