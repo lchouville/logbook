@@ -470,6 +470,13 @@ partageForm.addEventListener('submit', async (event) => {
   }
 });
 
+function renderLoading(list) {
+  list.innerHTML = '';
+  const li = document.createElement('li');
+  li.textContent = 'Chargement…';
+  list.appendChild(li);
+}
+
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   signInButton.hidden = connected;
@@ -484,6 +491,10 @@ onAuthChange(async (token) => {
   partageError.textContent = '';
   partagesRecusError.textContent = '';
   if (connected) {
+    renderLoading(entryList);
+    renderLoading(partageList);
+    renderLoading(partagesRecusList);
+
     try {
       settings = await loadSettings();
     } catch (error) {
@@ -492,12 +503,15 @@ onAuthChange(async (token) => {
     }
     themeSelect.value = settings.theme ?? DEFAULT_THEME;
     applyTheme(settings.theme ?? DEFAULT_THEME);
+
     try {
       entries = await loadEntries();
     } catch (error) {
       entries = [];
       entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
     }
+    renderEntries();
+
     try {
       partages = await loadPartages();
     } catch (error) {
@@ -509,12 +523,15 @@ onAuthChange(async (token) => {
     } catch {
       ownerName = null;
     }
+    renderPartages();
+
     try {
       partagesRecus = await loadPartagesRecus();
     } catch (error) {
       partagesRecus = [];
       partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
     }
+    renderPartagesRecus();
   } else {
     entries = [];
     settings = {};
@@ -523,8 +540,8 @@ onAuthChange(async (token) => {
     ownerName = null;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
+    renderEntries();
+    renderPartages();
+    renderPartagesRecus();
   }
-  renderEntries();
-  renderPartages();
-  renderPartagesRecus();
 });
