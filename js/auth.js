@@ -1,6 +1,7 @@
 import { GOOGLE_CLIENT_ID, DRIVE_SCOPE } from './config.js';
 
 const TOKEN_STORAGE_KEY = 'logbook_access_token';
+const SIGNED_OUT_KEY = 'logbook_signed_out';
 
 let tokenClient = null;
 let accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY) || null;
@@ -35,6 +36,7 @@ async function getTokenClient() {
       if (response.access_token) {
         accessToken = response.access_token;
         sessionStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+        localStorage.removeItem(SIGNED_OUT_KEY);
         notifyChange();
       }
     },
@@ -62,5 +64,16 @@ export function signOut() {
   }
   accessToken = null;
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  localStorage.setItem(SIGNED_OUT_KEY, '1');
   notifyChange();
+}
+
+// Tente une reconnexion silencieuse (sans écran de consentement) à chaque
+// chargement de page tant que l'utilisateur ne s'est pas déconnecté
+// explicitement — évite de recliquer "Se connecter" à chaque nouvel onglet
+// si une session Google active et un consentement déjà donné existent.
+if (!accessToken && localStorage.getItem(SIGNED_OUT_KEY) !== '1') {
+  getTokenClient().then((client) => {
+    client.requestAccessToken({ prompt: '' });
+  });
 }

@@ -255,7 +255,21 @@ form button[type="submit"] {
 
 .partage-actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
+}
+
+.partage-actions a {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  color: var(--color-fg);
+  text-decoration: none;
+}
+
+.partage-actions a:hover {
+  background: var(--color-bg-hover);
 }
 
 .ressenti-froid-form {
