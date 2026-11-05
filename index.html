@@ -60,7 +60,25 @@
       </form>
       <p id="entry-error" role="alert"></p>
       <h2>Entrées</h2>
-      <ul id="entry-list"></ul>
+      <ul id="entry-list" class="card-list"></ul>
+    </section>
+    <section id="partages" hidden>
+      <h2>Partages</h2>
+      <form id="partage-form">
+        <label for="partage-nom">Nom</label>
+        <input id="partage-nom" type="text" required>
+
+        <label for="partage-email">Email Google de la personne invitée</label>
+        <input id="partage-email" type="email" required>
+
+        <fieldset id="partage-regles">
+          <legend>Visible par thème et niveau</legend>
+        </fieldset>
+
+        <button type="submit">Créer le partage</button>
+      </form>
+      <p id="partage-error" role="alert"></p>
+      <ul id="partage-list" class="card-list"></ul>
     </section>
   </main>
   <script type="module" src="js/app.js"></script>
