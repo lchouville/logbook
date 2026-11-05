@@ -75,6 +75,10 @@ async function recordPartageRecu() {
 
 async function loadAndRender() {
   viewerError.textContent = '';
+  viewerList.innerHTML = '';
+  const loading = document.createElement('li');
+  loading.textContent = 'Chargement…';
+  viewerList.appendChild(loading);
   try {
     const entries = await loadSharedFile(fileId);
     viewerGrantAccess.hidden = true;
