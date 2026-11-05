@@ -248,6 +248,22 @@ form button[type="submit"] {
   flex: 1;
 }
 
+.ressenti-froid-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.ressenti-froid-form label {
+  display: inline;
+  margin: 0;
+}
+
+.ressenti-froid-form input {
+  width: 4rem;
+}
+
 [role="alert"] {
   color: var(--color-danger);
   min-height: 1.25rem;
