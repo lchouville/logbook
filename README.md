@@ -68,6 +68,12 @@ Un partage existant peut être modifié (nom, règles, email) via le bouton "Mod
 
 Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtré via l'API Drive (`permissions.create`) — elle doit donc aussi être ajoutée en "Utilisateur test" du projet Google Cloud (même contrainte que pour le propriétaire, l'app étant en mode Test). Comme ce fichier n'est pas créé par sa propre session de l'app, le scope `drive.file` ne lui donne pas accès automatiquement : au premier chargement de `partage.html`, elle doit le sélectionner une fois via un sélecteur Google (Picker, `js/picker.js`), ce qui lui accorde l'accès à ce fichier précis sans élargir le scope du propriétaire ni le sien (le Picker nécessite `setAppId`, le numéro de projet Google Cloud — préfixe numérique du Client ID — sans quoi l'autorisation ne s'enregistre pas et l'API Drive continue de renvoyer 403 après la sélection).
 
+Une fois un partage accepté (fichier lu avec succès, directement ou après le Picker), il est enregistré dans `logbook-partages-recus.json` (propre Drive de la personne invitée, même dossier `Application/logbook`) avec le nom du fichier Drive comme libellé. La section "Partages reçus" d'`index.html` liste ces partages (lien vers `partage.html?id=<fichierId>`, bouton "Retirer" qui ne fait que les enlever de cette liste locale — n'affecte ni le partage ni l'accès côté propriétaire).
+
+## Connexion
+
+Le flux OAuth implicite de Google (`initTokenClient`, utilisé ici) ne délivre jamais de refresh token — une vraie session "reste connecté N jours" demanderait soit un backend pour stocker un refresh token côté serveur (contraire au choix "site statique"), soit de le stocker dans le navigateur (risque de sécurité réel si volé). À la place, `js/auth.js` retente une reconnexion silencieuse (`prompt: ''`, sans écran de consentement) à chaque chargement de page tant que l'utilisateur ne s'est pas déconnecté explicitement (`logbook_signed_out` dans `localStorage`) — ça évite de recliquer "Se connecter" à chaque nouvel onglet tant qu'une session Google active et un consentement déjà donné existent, sans garantie de durée fixe ni nouveau stockage sensible.
+
 ## État du projet
 
 - [x] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
@@ -82,5 +88,7 @@ Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtr
 - [ ] Tester en conditions réelles (deux comptes Google distincts) le flux Picker + révocation d'un partage, une fois la clé API Picker configurée (correctif `setAppId` appliqué, pas encore reconfirmé par un nouveau test croisé).
 - [x] Modifier un partage existant (nom, règles, email).
 - [x] Sortir `js/config.js` de Git (généré à la publication depuis des secrets GitHub Actions, `js/config.template.js` commité à la place).
-- [ ] Basculer la source de GitHub Pages sur "GitHub Actions" (Settings → Pages) et renseigner les secrets `GOOGLE_CLIENT_ID`/`GOOGLE_PICKER_API_KEY` du dépôt — sans ça, `deploy.yml` ne publie rien.
+- [x] Basculer la source de GitHub Pages sur "GitHub Actions" et renseigner les secrets `GOOGLE_CLIENT_ID`/`GOOGLE_PICKER_API_KEY` du dépôt.
 - [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
+- [x] Reconnexion silencieuse (sans réafficher l'écran de consentement à chaque nouvel onglet, tant que l'utilisateur ne s'est pas déconnecté explicitement).
+- [x] Voir, depuis son propre compte, les tableaux de bord partagés avec soi ("Partages reçus" dans `index.html`).

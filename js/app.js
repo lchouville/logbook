@@ -13,6 +13,8 @@ import {
   shareFileWithEmail,
   revokePermission,
   deleteSharedFile,
+  loadPartagesRecus,
+  savePartagesRecus,
 } from './drive.js';
 import {
   createEntry,
@@ -51,10 +53,14 @@ const partageSubmit = document.getElementById('partage-submit');
 const partageCancel = document.getElementById('partage-cancel');
 const partageList = document.getElementById('partage-list');
 const partageError = document.getElementById('partage-error');
+const partagesRecusSection = document.getElementById('partages-recus');
+const partagesRecusList = document.getElementById('partages-recus-list');
+const partagesRecusError = document.getElementById('partages-recus-error');
 
 let entries = [];
 let settings = {};
 let partages = [];
+let partagesRecus = [];
 let editingPartageId = null;
 let ownerName = null;
 
@@ -325,6 +331,48 @@ function renderPartages() {
   }
 }
 
+async function retirerPartageRecu(partageRecu) {
+  partagesRecusError.textContent = '';
+  const previous = partagesRecus;
+  partagesRecus = partagesRecus.filter((p) => p.id !== partageRecu.id);
+  renderPartagesRecus();
+  try {
+    await savePartagesRecus(partagesRecus);
+  } catch (error) {
+    partagesRecus = previous;
+    partagesRecusError.textContent = `Échec du retrait : ${error.message}`;
+    renderPartagesRecus();
+  }
+}
+
+function renderPartagesRecus() {
+  partagesRecusList.innerHTML = '';
+  for (const partageRecu of partagesRecus) {
+    const li = document.createElement('li');
+
+    const titre = document.createElement('p');
+    titre.textContent = partageRecu.nom;
+    li.appendChild(titre);
+
+    const actions = document.createElement('div');
+    actions.className = 'partage-actions';
+
+    const voirLink = document.createElement('a');
+    voirLink.href = buildPartageLink(partageRecu.fichierId);
+    voirLink.textContent = 'Voir';
+    actions.appendChild(voirLink);
+
+    const retirerButton = document.createElement('button');
+    retirerButton.type = 'button';
+    retirerButton.textContent = 'Retirer';
+    retirerButton.addEventListener('click', () => retirerPartageRecu(partageRecu));
+    actions.appendChild(retirerButton);
+
+    li.appendChild(actions);
+    partagesRecusList.appendChild(li);
+  }
+}
+
 signInButton.addEventListener('click', signIn);
 signOutButton.addEventListener('click', signOut);
 
@@ -429,10 +477,12 @@ onAuthChange(async (token) => {
   settingsSection.hidden = !connected;
   entriesSection.hidden = !connected;
   partagesSection.hidden = !connected;
+  partagesRecusSection.hidden = !connected;
   authStatus.textContent = connected ? 'Connecté à Google Drive.' : 'Non connecté.';
   entryError.textContent = '';
   settingsError.textContent = '';
   partageError.textContent = '';
+  partagesRecusError.textContent = '';
   if (connected) {
     try {
       settings = await loadSettings();
@@ -459,14 +509,22 @@ onAuthChange(async (token) => {
     } catch {
       ownerName = null;
     }
+    try {
+      partagesRecus = await loadPartagesRecus();
+    } catch (error) {
+      partagesRecus = [];
+      partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
+    }
   } else {
     entries = [];
     settings = {};
     partages = [];
+    partagesRecus = [];
     ownerName = null;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
   }
   renderEntries();
   renderPartages();
+  renderPartagesRecus();
 });
