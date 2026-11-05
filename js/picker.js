@@ -1,4 +1,8 @@
-import { GOOGLE_PICKER_API_KEY } from './config.js';
+import { GOOGLE_CLIENT_ID, GOOGLE_PICKER_API_KEY } from './config.js';
+
+// Le numéro de projet Google Cloud est le préfixe numérique du Client ID OAuth
+// (format <numéro_projet>-xxxxx.apps.googleusercontent.com).
+const GOOGLE_PROJECT_NUMBER = GOOGLE_CLIENT_ID.split('-')[0];
 
 let pickerApiReady = null;
 
@@ -24,6 +28,7 @@ export async function pickSharedFile(accessToken) {
       .addView(view)
       .setOAuthToken(accessToken)
       .setDeveloperKey(GOOGLE_PICKER_API_KEY)
+      .setAppId(GOOGLE_PROJECT_NUMBER)
       .setCallback((data) => {
         if (data.action === google.picker.Action.PICKED) {
           resolve(data.docs[0].id);
