@@ -62,9 +62,11 @@ Un partage rend visible, à une personne précise, un sous-ensemble filtré des 
 
 Le filtre (`regles`) associe chaque thème partagé à l'ensemble des niveaux d'accès visibles pour ce thème — le niveau est relatif au thème, pas un filtre global croisé (ex. `{ "Travail": ["N1","N2"], "Santé": ["N1"] }` partage les entrées Travail de niveau N1 ou N2, et seulement les entrées Santé de niveau N1). Une entrée est visible si au moins un de ses thèmes a une règle incluant son niveau (`filtrerEntreesPartage` dans `js/entries.js`).
 
-Côté stockage, un partage crée/maintient à jour (à chaque sauvegarde d'entrée) un fichier `partage-<uuid>.json` dans `Application/logbook/partages/`, et la configuration de tous les partages (nom, règles, emails invités, fichier associé) est dans `logbook-partages.json` à la racine de `Application/logbook`.
+Côté stockage, un partage crée/maintient à jour (à chaque sauvegarde d'entrée, par son `fichierId` directement — pas de recherche par nom) un fichier dans `Application/logbook/partages/`, nommé `<Nom du propriétaire> — <nom du partage>.json` (le nom du propriétaire vient de l'API Drive `about`, `getOwnerDisplayName` dans `js/drive.js` — pas besoin d'élargir le scope OAuth pour ça) afin que la personne invitée reconnaisse facilement le bon fichier dans le sélecteur Google. La configuration de tous les partages (nom, règles, emails invités, fichier associé, id de la permission Drive accordée) est dans `logbook-partages.json` à la racine de `Application/logbook`.
 
-Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtré via l'API Drive (`permissions.create`) — elle doit donc aussi être ajoutée en "Utilisateur test" du projet Google Cloud (même contrainte que pour le propriétaire, l'app étant en mode Test). Comme ce fichier n'est pas créé par sa propre session de l'app, le scope `drive.file` ne lui donne pas accès automatiquement : au premier chargement de `partage.html`, elle doit le sélectionner une fois via un sélecteur Google (Picker, `js/picker.js`), ce qui lui accorde l'accès à ce fichier précis sans élargir le scope du propriétaire ni le sien.
+Un partage existant peut être modifié (nom, règles, email) via le bouton "Modifier" — rechange le fichier Drive si le nom change, et ne révoque/recrée la permission Drive que si l'email change.
+
+Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtré via l'API Drive (`permissions.create`) — elle doit donc aussi être ajoutée en "Utilisateur test" du projet Google Cloud (même contrainte que pour le propriétaire, l'app étant en mode Test). Comme ce fichier n'est pas créé par sa propre session de l'app, le scope `drive.file` ne lui donne pas accès automatiquement : au premier chargement de `partage.html`, elle doit le sélectionner une fois via un sélecteur Google (Picker, `js/picker.js`), ce qui lui accorde l'accès à ce fichier précis sans élargir le scope du propriétaire ni le sien (le Picker nécessite `setAppId`, le numéro de projet Google Cloud — préfixe numérique du Client ID — sans quoi l'autorisation ne s'enregistre pas et l'API Drive continue de renvoyer 403 après la sélection).
 
 ## État du projet
 
@@ -77,7 +79,8 @@ Côté accès, la personne invitée est ajoutée comme lectrice du fichier filtr
 - [x] Thème clair/sombre/appareil, par défaut proche de Notion, préférence stockée dans `logbook-settings.json`.
 - [ ] Import de thèmes personnalisés depuis un dossier partagé (structure à définir).
 - [x] Partage du tableau de bord par lien, filtré par thème et niveau d'accès (`partage.html`, accès invité via Google Picker).
-- [ ] Tester en conditions réelles (deux comptes Google distincts) le flux Picker + révocation d'un partage, une fois la clé API Picker configurée.
+- [ ] Tester en conditions réelles (deux comptes Google distincts) le flux Picker + révocation d'un partage, une fois la clé API Picker configurée (correctif `setAppId` appliqué, pas encore reconfirmé par un nouveau test croisé).
+- [x] Modifier un partage existant (nom, règles, email).
 - [x] Sortir `js/config.js` de Git (généré à la publication depuis des secrets GitHub Actions, `js/config.template.js` commité à la place).
 - [ ] Basculer la source de GitHub Pages sur "GitHub Actions" (Settings → Pages) et renseigner les secrets `GOOGLE_CLIENT_ID`/`GOOGLE_PICKER_API_KEY` du dépôt — sans ça, `deploy.yml` ne publie rien.
 - [ ] Publier l'application OAuth (sortir du mode Test) une fois le branding complété, pour éviter l'expiration du jeton au bout de 7 jours.
