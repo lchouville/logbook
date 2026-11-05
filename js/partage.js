@@ -60,15 +60,16 @@ async function recordPartageRecu() {
     const nom = await getSharedFileName(fileId);
     try {
       await createPartageRecuShortcut(fileId, nom);
-    } catch {
-      // Best-effort : le raccourci Drive est un confort, pas une nécessité.
+    } catch (error) {
+      console.warn('Échec de la création du raccourci Drive :', error);
     }
     await savePartagesRecus([
       ...recus,
       { id: crypto.randomUUID(), fichierId: fileId, nom, premierAccesLe: new Date().toISOString() },
     ]);
-  } catch {
-    // Best-effort : ne doit pas empêcher l'affichage du partage si ça échoue.
+  } catch (error) {
+    console.error('Échec de l\'enregistrement dans « Partages reçus » :', error);
+    viewerError.textContent = `Partage affiché, mais pas ajouté à « Partages reçus » : ${error.message}`;
   }
 }
 
