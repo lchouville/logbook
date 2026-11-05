@@ -26,14 +26,20 @@ import {
   TYPES_JOURNEE,
 } from './entries.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
+import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
+import { openModal, closeModal } from './modal.js';
+import { renderJournalPartage } from './viewer.js';
 
+const authSection = document.getElementById('auth');
 const signInButton = document.getElementById('sign-in');
-const signOutButton = document.getElementById('sign-out');
 const authStatus = document.getElementById('auth-status');
-const settingsSection = document.getElementById('settings');
+const appShell = document.getElementById('app-shell');
+const signOutButton = document.getElementById('sign-out');
+
 const themeSelect = document.getElementById('theme-select');
 const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
+const journalPartageSection = document.getElementById('journal-partage');
 const entryForm = document.getElementById('entry-form');
 const entryThemes = document.getElementById('entry-themes');
 const entryNiveau = document.getElementById('entry-niveau');
@@ -44,7 +50,6 @@ const entryRessenti = document.getElementById('entry-ressenti');
 const entryTexte = document.getElementById('entry-texte');
 const entryList = document.getElementById('entry-list');
 const entryError = document.getElementById('entry-error');
-const partagesSection = document.getElementById('partages');
 const partageForm = document.getElementById('partage-form');
 const partageNom = document.getElementById('partage-nom');
 const partageEmail = document.getElementById('partage-email');
@@ -53,7 +58,6 @@ const partageSubmit = document.getElementById('partage-submit');
 const partageCancel = document.getElementById('partage-cancel');
 const partageList = document.getElementById('partage-list');
 const partageError = document.getElementById('partage-error');
-const partagesRecusSection = document.getElementById('partages-recus');
 const partagesRecusList = document.getElementById('partages-recus-list');
 const partagesRecusError = document.getElementById('partages-recus-error');
 
@@ -63,9 +67,18 @@ let partages = [];
 let partagesRecus = [];
 let editingPartageId = null;
 let ownerName = null;
+let currentJournalId = null;
 
 function buildSharedFileName(nom) {
   return `${(ownerName ?? 'Logbook').trim()} — ${nom.trim()}.json`;
+}
+
+function buildPartageLink(fichierId) {
+  return new URL(`index.html?journal=${fichierId}`, window.location.href).toString();
+}
+
+function getJournalIdFromUrl() {
+  return new URLSearchParams(window.location.search).get('journal');
 }
 
 themeSelect.addEventListener('change', async () => {
@@ -221,10 +234,6 @@ function stopEditPartage() {
   partageCancel.hidden = true;
 }
 
-function buildPartageLink(fichierId) {
-  return new URL(`partage.html?id=${fichierId}`, window.location.href).toString();
-}
-
 function renderEntries() {
   entryList.innerHTML = '';
   for (const entry of [...entries].reverse()) {
@@ -336,12 +345,14 @@ async function retirerPartageRecu(partageRecu) {
   const previous = partagesRecus;
   partagesRecus = partagesRecus.filter((p) => p.id !== partageRecu.id);
   renderPartagesRecus();
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
   try {
     await savePartagesRecus(partagesRecus);
   } catch (error) {
     partagesRecus = previous;
     partagesRecusError.textContent = `Échec du retrait : ${error.message}`;
     renderPartagesRecus();
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
   }
 }
 
@@ -357,10 +368,11 @@ function renderPartagesRecus() {
     const actions = document.createElement('div');
     actions.className = 'partage-actions';
 
-    const voirLink = document.createElement('a');
-    voirLink.href = buildPartageLink(partageRecu.fichierId);
-    voirLink.textContent = 'Voir';
-    actions.appendChild(voirLink);
+    const voirButton = document.createElement('button');
+    voirButton.type = 'button';
+    voirButton.textContent = 'Voir';
+    voirButton.addEventListener('click', () => setJournalId(partageRecu.fichierId));
+    actions.appendChild(voirButton);
 
     const retirerButton = document.createElement('button');
     retirerButton.type = 'button';
@@ -372,6 +384,49 @@ function renderPartagesRecus() {
     partagesRecusList.appendChild(li);
   }
 }
+
+function renderMainView() {
+  if (currentJournalId) {
+    entriesSection.hidden = true;
+    journalPartageSection.hidden = false;
+    renderJournalPartage(currentJournalId, (updated) => {
+      partagesRecus = updated;
+      renderPartagesRecus();
+      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    });
+  } else {
+    entriesSection.hidden = false;
+    journalPartageSection.hidden = true;
+  }
+}
+
+function setJournalId(fichierId) {
+  currentJournalId = fichierId;
+  const url = new URL(window.location.href);
+  if (fichierId) {
+    url.searchParams.set('journal', fichierId);
+  } else {
+    url.searchParams.delete('journal');
+  }
+  window.history.pushState({ journal: fichierId }, '', url);
+  renderMainView();
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+  closeModal();
+  closeSidebarOnMobile();
+}
+
+window.addEventListener('popstate', () => {
+  currentJournalId = getJournalIdFromUrl();
+  renderMainView();
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+});
+
+initSidebar({
+  onSelectJournal: setJournalId,
+  onOpenSettings: () => openModal('settings'),
+  onOpenPartages: () => openModal('partages'),
+  onOpenAcces: () => openModal('partages-recus'),
+});
 
 signInButton.addEventListener('click', signIn);
 signOutButton.addEventListener('click', signOut);
@@ -479,18 +534,16 @@ function renderLoading(list) {
 
 onAuthChange(async (token) => {
   const connected = Boolean(token);
-  signInButton.hidden = connected;
-  signOutButton.hidden = !connected;
-  settingsSection.hidden = !connected;
-  entriesSection.hidden = !connected;
-  partagesSection.hidden = !connected;
-  partagesRecusSection.hidden = !connected;
+  authSection.hidden = connected;
+  appShell.hidden = !connected;
   authStatus.textContent = connected ? 'Connecté à Google Drive.' : 'Non connecté.';
   entryError.textContent = '';
   settingsError.textContent = '';
   partageError.textContent = '';
   partagesRecusError.textContent = '';
+
   if (connected) {
+    currentJournalId = getJournalIdFromUrl();
     renderLoading(entryList);
     renderLoading(partageList);
     renderLoading(partagesRecusList);
@@ -532,16 +585,21 @@ onAuthChange(async (token) => {
       partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
     }
     renderPartagesRecus();
+
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    renderMainView();
   } else {
     entries = [];
     settings = {};
     partages = [];
     partagesRecus = [];
     ownerName = null;
+    currentJournalId = null;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
     renderEntries();
     renderPartages();
     renderPartagesRecus();
+    closeModal();
   }
 });
