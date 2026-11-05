@@ -1,5 +1,5 @@
 import { onAuthChange, signIn, signOut, getAccessToken } from './auth.js';
-import { loadSharedFile } from './drive.js';
+import { loadSharedFile, getSharedFileName, loadPartagesRecus, savePartagesRecus } from './drive.js';
 import { pickSharedFile } from './picker.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
 
@@ -47,12 +47,27 @@ function renderViewerEntries(entries) {
   }
 }
 
+async function recordPartageRecu() {
+  try {
+    const recus = await loadPartagesRecus();
+    if (recus.some((p) => p.fichierId === fileId)) return;
+    const nom = await getSharedFileName(fileId);
+    await savePartagesRecus([
+      ...recus,
+      { id: crypto.randomUUID(), fichierId: fileId, nom, premierAccesLe: new Date().toISOString() },
+    ]);
+  } catch {
+    // Best-effort : ne doit pas empêcher l'affichage du partage si ça échoue.
+  }
+}
+
 async function loadAndRender() {
   viewerError.textContent = '';
   try {
     const entries = await loadSharedFile(fileId);
     viewerGrantAccess.hidden = true;
     renderViewerEntries(entries);
+    await recordPartageRecu();
   } catch (error) {
     viewerList.innerHTML = '';
     viewerGrantAccess.hidden = false;
