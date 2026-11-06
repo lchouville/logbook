@@ -1,4 +1,4 @@
-import { getAccessToken } from './auth.js';
+import { getAccessToken, refreshAccessToken } from './auth.js';
 
 const APP_FOLDER_NAME = 'Application';
 const DATA_FOLDER_NAME = 'logbook';
@@ -26,6 +26,19 @@ function authHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
+// Point d'entrée unique pour tous les appels Drive : rejoue automatiquement
+// la requête une fois avec un token rafraîchi si l'API renvoie 401 (token
+// expiré), au lieu de laisser chaque appelant échouer silencieusement.
+async function driveFetch(url, options = {}) {
+  const response = await fetch(url, { ...options, headers: { ...options.headers, ...authHeaders() } });
+  if (response.status !== 401) return response;
+
+  const refreshed = await refreshAccessToken();
+  if (!refreshed) throw new Error('Session Google expirée, reconnecte-toi.');
+
+  return fetch(url, { ...options, headers: { ...options.headers, ...authHeaders() } });
+}
+
 async function describeError(response) {
   const body = await response.json().catch(() => null);
   const apiMessage = body?.error?.message;
@@ -39,7 +52,7 @@ async function findFolder(name, parentId) {
     spaces: 'drive',
     fields: 'files(id,name)',
   });
-  const response = await fetch(`${DRIVE_FILES_URL}?${params}`, { headers: authHeaders() });
+  const response = await driveFetch(`${DRIVE_FILES_URL}?${params}`);
   if (!response.ok) throw new Error(`Recherche du dossier Drive : ${await describeError(response)}`);
   const data = await response.json();
   return data.files?.[0]?.id ?? null;
@@ -52,9 +65,9 @@ async function createFolder(name, parentId) {
     parents: parentId ? [parentId] : undefined,
     folderColorRgb: FOLDER_COLOR,
   };
-  const response = await fetch(`${DRIVE_FILES_URL}?fields=id`, {
+  const response = await driveFetch(`${DRIVE_FILES_URL}?fields=id`, {
     method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(metadata),
   });
   if (!response.ok) throw new Error(`Création du dossier Drive : ${await describeError(response)}`);
@@ -94,7 +107,7 @@ async function migrateLegacyFile(folderId) {
     spaces: 'drive',
     fields: 'files(id,parents)',
   });
-  const response = await fetch(`${DRIVE_FILES_URL}?${params}`, { headers: authHeaders() });
+  const response = await driveFetch(`${DRIVE_FILES_URL}?${params}`);
   if (!response.ok) throw new Error(`Recherche du fichier Drive (migration) : ${await describeError(response)}`);
   const data = await response.json();
   const legacyFile = data.files?.[0];
@@ -105,10 +118,7 @@ async function migrateLegacyFile(folderId) {
     removeParents: (legacyFile.parents ?? []).join(','),
     fields: 'id',
   });
-  const moveResponse = await fetch(`${DRIVE_FILES_URL}/${legacyFile.id}?${moveParams}`, {
-    method: 'PATCH',
-    headers: authHeaders(),
-  });
+  const moveResponse = await driveFetch(`${DRIVE_FILES_URL}/${legacyFile.id}?${moveParams}`, { method: 'PATCH' });
   if (!moveResponse.ok) throw new Error(`Déplacement du fichier Drive : ${await describeError(moveResponse)}`);
   return legacyFile.id;
 }
@@ -120,7 +130,7 @@ async function findFileId(fileName, folderId) {
     spaces: 'drive',
     fields: 'files(id,name)',
   });
-  const response = await fetch(`${DRIVE_FILES_URL}?${params}`, { headers: authHeaders() });
+  const response = await driveFetch(`${DRIVE_FILES_URL}?${params}`);
   if (!response.ok) throw new Error(`Recherche du fichier Drive : ${await describeError(response)}`);
   const data = await response.json();
   const fileId = data.files?.[0]?.id ?? (fileName === DATA_FILE_NAME ? await migrateLegacyFile(folderId) : null);
@@ -134,9 +144,8 @@ async function createFile(fileName, content, folderId) {
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
   form.append('file', new Blob([JSON.stringify(content)], { type: 'application/json' }));
 
-  const response = await fetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id`, {
+  const response = await driveFetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id`, {
     method: 'POST',
-    headers: authHeaders(),
     body: form,
   });
   if (!response.ok) throw new Error(`Création du fichier Drive : ${await describeError(response)}`);
@@ -146,9 +155,9 @@ async function createFile(fileName, content, folderId) {
 }
 
 async function updateFile(fileId, content) {
-  const response = await fetch(`${DRIVE_UPLOAD_URL}/${fileId}?uploadType=media`, {
+  const response = await driveFetch(`${DRIVE_UPLOAD_URL}/${fileId}?uploadType=media`, {
     method: 'PATCH',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(content),
   });
   if (!response.ok) throw new Error(`Mise à jour du fichier Drive : ${await describeError(response)}`);
@@ -157,7 +166,7 @@ async function updateFile(fileId, content) {
 async function loadJsonFile(fileName, fallback, folderId) {
   const fileId = await findFileId(fileName, folderId);
   if (!fileId) return fallback;
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, { headers: authHeaders() });
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`);
   if (!response.ok) throw new Error(`Lecture du fichier Drive : ${await describeError(response)}`);
   return response.json();
 }
@@ -204,9 +213,9 @@ export async function updateSharedFile(fileId, entries) {
 }
 
 export async function renameSharedFile(fileId, newName) {
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}`, {
     method: 'PATCH',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: newName }),
   });
   if (!response.ok) throw new Error(`Renommage du fichier Drive : ${await describeError(response)}`);
@@ -214,16 +223,16 @@ export async function renameSharedFile(fileId, newName) {
 
 export async function getOwnerDisplayName() {
   const params = new URLSearchParams({ fields: 'user' });
-  const response = await fetch(`${DRIVE_ABOUT_URL}?${params}`, { headers: authHeaders() });
+  const response = await driveFetch(`${DRIVE_ABOUT_URL}?${params}`);
   if (!response.ok) throw new Error(`Lecture du profil Drive : ${await describeError(response)}`);
   const data = await response.json();
   return data.user?.displayName ?? data.user?.emailAddress ?? null;
 }
 
 export async function shareFileWithEmail(fileId, email) {
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false&fields=id`, {
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false&fields=id`, {
     method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role: 'reader', type: 'user', emailAddress: email }),
   });
   if (!response.ok) throw new Error(`Partage du fichier Drive : ${await describeError(response)}`);
@@ -232,30 +241,24 @@ export async function shareFileWithEmail(fileId, email) {
 }
 
 export async function revokePermission(fileId, permissionId) {
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions/${permissionId}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}/permissions/${permissionId}`, { method: 'DELETE' });
   if (!response.ok) throw new Error(`Révocation de l'accès Drive : ${await describeError(response)}`);
 }
 
 export async function deleteSharedFile(fileId) {
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}`, { method: 'DELETE' });
   if (!response.ok) throw new Error(`Suppression du fichier Drive : ${await describeError(response)}`);
 }
 
 export async function loadSharedFile(fileId) {
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, { headers: authHeaders() });
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`);
   if (!response.ok) throw new Error(`Lecture du fichier partagé : ${await describeError(response)}`);
   return response.json();
 }
 
 export async function getSharedFileName(fileId) {
   const params = new URLSearchParams({ fields: 'name' });
-  const response = await fetch(`${DRIVE_FILES_URL}/${fileId}?${params}`, { headers: authHeaders() });
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?${params}`);
   if (!response.ok) throw new Error(`Lecture du nom du fichier partagé : ${await describeError(response)}`);
   const data = await response.json();
   return data.name;
@@ -269,9 +272,9 @@ export async function createPartageRecuShortcut(fileId, name) {
     parents: [folderId],
     shortcutDetails: { targetId: fileId },
   };
-  const response = await fetch(`${DRIVE_FILES_URL}?fields=id`, {
+  const response = await driveFetch(`${DRIVE_FILES_URL}?fields=id`, {
     method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(metadata),
   });
   if (!response.ok) throw new Error(`Création du raccourci Drive : ${await describeError(response)}`);
