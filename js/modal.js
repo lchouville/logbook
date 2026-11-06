@@ -2,7 +2,7 @@ const modalRoot = document.getElementById('modal-root');
 const modalBackdrop = document.getElementById('modal-backdrop');
 const modalClose = document.getElementById('modal-close');
 
-const SECTION_IDS = ['settings', 'partages', 'partages-recus'];
+const SECTION_IDS = ['entry-form-modal', 'settings', 'partages', 'partages-recus'];
 
 export function closeModal() {
   modalRoot.hidden = true;

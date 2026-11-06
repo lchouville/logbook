@@ -4,9 +4,10 @@ export const THEMES = ['Relation', 'Santé', 'Travail', 'Trauma', 'Moral', 'Iden
 export const TYPES_JOURNEE = ['Ordinaire', 'Centrée sur le sujet', 'Exceptionnelle'];
 export const DELAI_RESSENTI_A_FROID_JOURS = 2;
 
-export function createEntry({ date, themes, niveauAcces, statut, typeJournee, energie, ressenti, texte }) {
+export function createEntry({ titre, date, themes, niveauAcces, statut, typeJournee, energie, ressenti, texte }) {
   return {
     id: crypto.randomUUID(),
+    titre,
     date,
     themes,
     niveauAcces,
