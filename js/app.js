@@ -4,10 +4,10 @@ import {
   saveEntries,
   loadSettings,
   saveSettings,
-  loadSchema,
-  saveSchema,
   loadPartages,
   savePartages,
+  loadModeles,
+  saveModeles,
   createSharedFile,
   updateSharedFile,
   renameSharedFile,
@@ -27,19 +27,13 @@ import {
   STATUTS,
   THEMES,
   TYPES_JOURNEE,
+  FIXED_BLOCK_KEYS,
 } from './entries.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
 import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
 import { openModal, closeModal } from './modal.js';
 import { renderJournalPartage } from './viewer.js';
-import {
-  initSchemaUI,
-  renderSchemaColumns,
-  renderCustomCells,
-  renderCustomFormFields,
-  readCustomFormValues,
-  closeFieldEditor,
-} from './schema.js';
+import { createFieldsEditor } from './schema.js';
 
 const authSection = document.getElementById('auth');
 const signInButton = document.getElementById('sign-in');
@@ -52,6 +46,7 @@ const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
 const entryNewButton = document.getElementById('entry-new-button');
+const entryNewMenu = document.getElementById('entry-new-menu');
 const entryForm = document.getElementById('entry-form');
 const entryFormTitle = document.getElementById('entry-form-title');
 const entrySubmitButton = document.getElementById('entry-submit');
@@ -63,10 +58,12 @@ const entryTypeJournee = document.getElementById('entry-type-journee');
 const entryEnergie = document.getElementById('entry-energie');
 const entryRessenti = document.getElementById('entry-ressenti');
 const entryTexte = document.getElementById('entry-texte');
-const entryCustomFieldsContainer = document.getElementById('entry-form-custom-fields');
+const entryDateDisplay = document.getElementById('entry-date-display');
+const entryRessentiFroidSlot = document.getElementById('entry-ressenti-froid-slot');
+const entryBlocksList = document.getElementById('entry-blocks-list');
+const entryAddFieldButton = document.getElementById('entry-add-field-button');
 const entryTableBody = document.getElementById('entry-table-body');
 const entryError = document.getElementById('entry-error');
-const schemaError = document.getElementById('schema-error');
 const partageForm = document.getElementById('partage-form');
 const partageNom = document.getElementById('partage-nom');
 const partageEmail = document.getElementById('partage-email');
@@ -77,14 +74,30 @@ const partageList = document.getElementById('partage-list');
 const partageError = document.getElementById('partage-error');
 const partagesRecusList = document.getElementById('partages-recus-list');
 const partagesRecusError = document.getElementById('partages-recus-error');
+const modeleForm = document.getElementById('modele-form');
+const modeleNom = document.getElementById('modele-nom');
+const modeleThemes = document.getElementById('modele-themes');
+const modeleNiveau = document.getElementById('modele-niveau');
+const modeleStatut = document.getElementById('modele-statut');
+const modeleTypeJournee = document.getElementById('modele-type-journee');
+const modeleEnergie = document.getElementById('modele-energie');
+const modeleRessenti = document.getElementById('modele-ressenti');
+const modeleTexte = document.getElementById('modele-texte');
+const modeleBlocksList = document.getElementById('modele-blocks-list');
+const modeleAddFieldButton = document.getElementById('modele-add-field-button');
+const modeleSubmit = document.getElementById('modele-submit');
+const modeleCancel = document.getElementById('modele-cancel');
+const modeleList = document.getElementById('modele-list');
+const modeleError = document.getElementById('modele-error');
 
 let entries = [];
 let settings = {};
-let schema = [];
 let partages = [];
 let partagesRecus = [];
+let modeles = [];
 let editingPartageId = null;
 let editingEntryId = null;
+let editingModeleId = null;
 let ownerName = null;
 let currentJournalId = null;
 
@@ -129,6 +142,29 @@ populateSelect(entryThemes, THEMES);
 populateSelect(entryNiveau, NIVEAUX_ACCES);
 populateSelect(entryStatut, STATUTS);
 populateSelect(entryTypeJournee, TYPES_JOURNEE);
+populateSelect(modeleThemes, THEMES);
+populateSelect(modeleNiveau, NIVEAUX_ACCES);
+populateSelect(modeleStatut, STATUTS);
+populateSelect(modeleTypeJournee, TYPES_JOURNEE);
+
+function blankChampsSchema() {
+  return { fields: [], order: [...FIXED_BLOCK_KEYS] };
+}
+
+const entryFixedBlockElements = Object.fromEntries(
+  FIXED_BLOCK_KEYS.map((key) => [key, entryBlocksList.querySelector(`li[data-order-key="${key}"]`)]),
+);
+const entryFieldsEditor = createFieldsEditor({
+  listEl: entryBlocksList,
+  addButtonEl: entryAddFieldButton,
+  idPrefix: 'custom-field',
+  fixedBlockElements: entryFixedBlockElements,
+});
+const modeleFieldsEditor = createFieldsEditor({
+  listEl: modeleBlocksList,
+  addButtonEl: modeleAddFieldButton,
+  idPrefix: 'modele-field',
+});
 
 function buildRessentiAFroidForm(entry) {
   const form = document.createElement('form');
@@ -166,6 +202,7 @@ function buildRessentiAFroidForm(entry) {
     try {
       await saveEntries(entries);
       renderEntries();
+      renderRessentiAFroidSlot(entries.find((e) => e.id === entry.id));
     } catch (err) {
       entries = previousEntries;
       error.textContent = `Échec de l'enregistrement : ${err.message}`;
@@ -173,6 +210,28 @@ function buildRessentiAFroidForm(entry) {
   });
 
   return form;
+}
+
+function renderRessentiAFroidSlot(entry) {
+  entryRessentiFroidSlot.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'entry-property-label';
+  label.textContent = 'Ressenti à froid';
+  entryRessentiFroidSlot.appendChild(label);
+
+  if (entry.ressentiAFroid != null) {
+    const value = document.createElement('span');
+    value.className = 'entry-property-value';
+    value.textContent = `${entry.ressentiAFroid}/10`;
+    entryRessentiFroidSlot.appendChild(value);
+  } else if (peutRemplirRessentiAFroid(entry)) {
+    entryRessentiFroidSlot.appendChild(buildRessentiAFroidForm(entry));
+  } else {
+    const value = document.createElement('span');
+    value.className = 'entry-property-value';
+    value.textContent = '—';
+    entryRessentiFroidSlot.appendChild(value);
+  }
 }
 
 function buildPartageReglesTable() {
@@ -271,20 +330,7 @@ function renderEntries() {
     appendCell(row, entry.themes.join(', '));
     appendCell(row, entry.niveauAcces);
     appendCell(row, entry.statut);
-    appendCell(row, entry.mesuresSoir?.energie ?? '—');
-    appendCell(row, entry.mesuresSoir?.ressenti ?? '—');
     appendCell(row, entry.texte ?? '');
-
-    const froidCell = document.createElement('td');
-    if (entry.ressentiAFroid != null) {
-      froidCell.textContent = `${entry.ressentiAFroid}/10`;
-    } else if (peutRemplirRessentiAFroid(entry)) {
-      froidCell.appendChild(buildRessentiAFroidForm(entry));
-    } else {
-      froidCell.textContent = '—';
-    }
-    row.appendChild(froidCell);
-    renderCustomCells(row, entry, schema);
 
     entryTableBody.appendChild(row);
   }
@@ -293,27 +339,65 @@ function renderEntries() {
 function stopEditEntry() {
   editingEntryId = null;
   entryForm.reset();
-  entryCustomFieldsContainer.innerHTML = '';
+  entryRessentiFroidSlot.hidden = true;
+  entryRessentiFroidSlot.innerHTML = '';
+  entryDateDisplay.textContent = new Date().toISOString().slice(0, 10);
   entryFormTitle.textContent = 'Nouvelle entrée';
   entrySubmitButton.textContent = 'Enregistrer';
   entryError.textContent = '';
 }
 
+function applyFixedFieldsToForm(fields, els) {
+  for (const option of els.themes.options) option.selected = (fields.themes ?? []).includes(option.value);
+  els.niveau.value = fields.niveauAcces ?? '';
+  els.statut.value = fields.statut ?? '';
+  els.typeJournee.value = fields.typeJournee ?? '';
+  els.energie.value = fields.energie ?? fields.mesuresSoir?.energie ?? '';
+  els.ressenti.value = fields.ressenti ?? fields.mesuresSoir?.ressenti ?? '';
+  els.texte.value = fields.texte ?? '';
+}
+
+const entryFixedFieldEls = {
+  themes: entryThemes,
+  niveau: entryNiveau,
+  statut: entryStatut,
+  typeJournee: entryTypeJournee,
+  energie: entryEnergie,
+  ressenti: entryRessenti,
+  texte: entryTexte,
+};
+
 function startEditEntry(entry) {
-  closeFieldEditor();
   editingEntryId = entry.id;
   entryTitre.value = entry.titre ?? '';
-  for (const option of entryThemes.options) option.selected = entry.themes.includes(option.value);
-  entryNiveau.value = entry.niveauAcces;
-  entryStatut.value = entry.statut;
-  entryTypeJournee.value = entry.typeJournee;
-  entryEnergie.value = entry.mesuresSoir?.energie ?? '';
-  entryRessenti.value = entry.mesuresSoir?.ressenti ?? '';
-  entryTexte.value = entry.texte ?? '';
-  renderCustomFormFields(entryCustomFieldsContainer, schema, entry.champsPersonnalises);
-  entryFormTitle.textContent = entry.titre || 'Entrée';
+  applyFixedFieldsToForm(entry, entryFixedFieldEls);
+  entryDateDisplay.textContent = entry.date;
+  entryRessentiFroidSlot.hidden = false;
+  renderRessentiAFroidSlot(entry);
+  entryFieldsEditor.render(entry.champsSchema ?? blankChampsSchema(), entry.champsPersonnalises ?? {});
+  entryFormTitle.textContent = 'Modifier l’entrée';
   entrySubmitButton.textContent = 'Enregistrer les modifications';
   entryError.textContent = '';
+  openModal('entry-form-modal');
+}
+
+function openBlankEntryForm() {
+  stopEditEntry();
+  entryFieldsEditor.render(blankChampsSchema(), {});
+  openModal('entry-form-modal');
+}
+
+function applyModeleToForm(modele) {
+  stopEditEntry();
+  applyFixedFieldsToForm(modele, entryFixedFieldEls);
+  const modeleSchema = modele.champsSchema ?? { fields: [], order: [] };
+  entryFieldsEditor.render(
+    {
+      fields: modeleSchema.fields.map((f) => ({ ...f, options: f.options ? [...f.options] : f.options })),
+      order: [...FIXED_BLOCK_KEYS, ...modeleSchema.order],
+    },
+    { ...(modele.champsPersonnalises ?? {}) },
+  );
   openModal('entry-form-modal');
 }
 
@@ -447,6 +531,124 @@ function renderPartagesRecus() {
   }
 }
 
+function readModeleFixedFields() {
+  return {
+    themes: Array.from(modeleThemes.selectedOptions).map((option) => option.value),
+    niveauAcces: modeleNiveau.value,
+    statut: modeleStatut.value,
+    typeJournee: modeleTypeJournee.value,
+    energie: modeleEnergie.valueAsNumber,
+    ressenti: modeleRessenti.valueAsNumber,
+    texte: modeleTexte.value,
+  };
+}
+
+const modeleFixedFieldEls = {
+  themes: modeleThemes,
+  niveau: modeleNiveau,
+  statut: modeleStatut,
+  typeJournee: modeleTypeJournee,
+  energie: modeleEnergie,
+  ressenti: modeleRessenti,
+  texte: modeleTexte,
+};
+
+function startEditModele(modele) {
+  editingModeleId = modele.id;
+  modeleNom.value = modele.nom;
+  applyFixedFieldsToForm(modele, modeleFixedFieldEls);
+  modeleFieldsEditor.render(modele.champsSchema ?? { fields: [], order: [] }, modele.champsPersonnalises ?? {});
+  modeleSubmit.textContent = 'Enregistrer les modifications';
+  modeleCancel.hidden = false;
+  modeleError.textContent = '';
+}
+
+function stopEditModele() {
+  editingModeleId = null;
+  modeleForm.reset();
+  modeleFieldsEditor.render({ fields: [], order: [] }, {});
+  modeleSubmit.textContent = 'Créer le modèle';
+  modeleCancel.hidden = true;
+}
+
+function renderModeles() {
+  modeleList.innerHTML = '';
+  for (const modele of modeles) {
+    const li = document.createElement('li');
+
+    const nom = document.createElement('p');
+    nom.textContent = modele.nom;
+    li.appendChild(nom);
+
+    const actions = document.createElement('div');
+    actions.className = 'partage-actions';
+
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.textContent = 'Modifier';
+    editButton.addEventListener('click', () => startEditModele(modele));
+    actions.appendChild(editButton);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Supprimer';
+    deleteButton.addEventListener('click', () => deleteModele(modele));
+    actions.appendChild(deleteButton);
+
+    li.appendChild(actions);
+    modeleList.appendChild(li);
+  }
+}
+
+async function deleteModele(modele) {
+  modeleError.textContent = '';
+  if (editingModeleId === modele.id) stopEditModele();
+  const previousModeles = modeles;
+  modeles = modeles.filter((m) => m.id !== modele.id);
+  renderModeles();
+  renderEntryNewMenu();
+  try {
+    await saveModeles(modeles);
+  } catch (error) {
+    modeles = previousModeles;
+    modeleError.textContent = `Échec de la suppression : ${error.message}`;
+    renderModeles();
+    renderEntryNewMenu();
+  }
+}
+
+modeleCancel.addEventListener('click', stopEditModele);
+
+modeleForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  modeleError.textContent = '';
+  const nom = modeleNom.value.trim();
+  const fixed = readModeleFixedFields();
+  const champsPersonnalises = modeleFieldsEditor.getValues();
+  const champsSchema = modeleFieldsEditor.getSchema();
+  const previousModeles = modeles;
+
+  if (editingModeleId) {
+    modeles = modeles.map((m) => (m.id === editingModeleId ? { ...m, nom, ...fixed, champsPersonnalises, champsSchema } : m));
+  } else {
+    modeles = [
+      ...modeles,
+      { id: crypto.randomUUID(), nom, ...fixed, champsPersonnalises, champsSchema, creeLe: new Date().toISOString() },
+    ];
+  }
+  renderModeles();
+  renderEntryNewMenu();
+  try {
+    await saveModeles(modeles);
+    stopEditModele();
+  } catch (error) {
+    modeles = previousModeles;
+    renderModeles();
+    renderEntryNewMenu();
+    modeleError.textContent = `Échec de l'enregistrement du modèle : ${error.message}`;
+  }
+});
+
 function renderMainView() {
   if (currentJournalId) {
     entriesSection.hidden = true;
@@ -488,20 +690,66 @@ initSidebar({
   onOpenSettings: () => openModal('settings'),
   onOpenPartages: () => openModal('partages'),
   onOpenAcces: () => openModal('partages-recus'),
+  onOpenModeles: () => openModal('modeles'),
 });
 
 signInButton.addEventListener('click', signIn);
 signOutButton.addEventListener('click', signOut);
 
-entryNewButton.addEventListener('click', () => {
-  closeFieldEditor();
-  stopEditEntry();
-  renderCustomFormFields(entryCustomFieldsContainer, schema, {});
-  openModal('entry-form-modal');
+function closeEntryNewMenu() {
+  entryNewMenu.hidden = true;
+  entryNewButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleEntryNewMenu() {
+  const willOpen = entryNewMenu.hidden;
+  entryNewMenu.hidden = !willOpen;
+  entryNewButton.setAttribute('aria-expanded', String(willOpen));
+}
+
+function renderEntryNewMenu() {
+  for (const button of entryNewMenu.querySelectorAll('button[data-modele-id]:not([data-modele-id=""])')) {
+    button.remove();
+  }
+  for (const modele of modeles) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = modele.nom;
+    button.dataset.modeleId = modele.id;
+    entryNewMenu.appendChild(button);
+  }
+}
+
+entryNewButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  if (modeles.length === 0) {
+    openBlankEntryForm();
+    return;
+  }
+  toggleEntryNewMenu();
+});
+
+entryNewMenu.addEventListener('click', (event) => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  closeEntryNewMenu();
+  const modele = modeles.find((m) => m.id === button.dataset.modeleId);
+  if (modele) {
+    applyModeleToForm(modele);
+  } else {
+    openBlankEntryForm();
+  }
+});
+
+document.addEventListener('click', (event) => {
+  if (!entryNewMenu.hidden && !event.target.closest('#entry-new-wrapper')) closeEntryNewMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !entryNewMenu.hidden) closeEntryNewMenu();
 });
 
 entryTableBody.addEventListener('click', (event) => {
-  if (event.target.closest('.ressenti-froid-form')) return;
   const row = event.target.closest('tr');
   const entry = row && entries.find((e) => e.id === row.dataset.entryId);
   if (entry) startEditEntry(entry);
@@ -511,7 +759,8 @@ entryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   entryError.textContent = '';
   const themes = Array.from(entryThemes.selectedOptions).map((option) => option.value);
-  const champsPersonnalises = readCustomFormValues(entryCustomFieldsContainer, schema);
+  const champsPersonnalises = entryFieldsEditor.getValues();
+  const champsSchema = entryFieldsEditor.getSchema();
   const previousEntries = entries;
 
   if (editingEntryId) {
@@ -526,6 +775,7 @@ entryForm.addEventListener('submit', async (event) => {
       ressenti: entryRessenti.valueAsNumber,
       texte: entryTexte.value,
       champsPersonnalises,
+      champsSchema,
     });
     entries = entries.map((e) => (e.id === editingEntryId ? updated : e));
   } else {
@@ -540,6 +790,7 @@ entryForm.addEventListener('submit', async (event) => {
       ressenti: entryRessenti.valueAsNumber,
       texte: entryTexte.value,
       champsPersonnalises,
+      champsSchema,
     });
     entries = [...entries, entry];
   }
@@ -640,61 +891,23 @@ function renderTableLoading(tbody, colspan) {
   tbody.appendChild(row);
 }
 
-function renderSchemaUI() {
-  renderSchemaColumns(schema);
-  renderEntries();
-}
-
-async function handleSaveField(existingId, { nom, type, options }) {
-  schemaError.textContent = '';
-  const previousSchema = schema;
-  schema = existingId
-    ? schema.map((f) => (f.id === existingId ? { ...f, nom, ...(f.type === 'select' ? { options } : {}) } : f))
-    : [...schema, { id: crypto.randomUUID(), nom, type, ...(type === 'select' ? { options } : {}) }];
-  renderSchemaUI();
-  closeFieldEditor();
-  try {
-    await saveSchema(schema);
-  } catch (error) {
-    schema = previousSchema;
-    renderSchemaUI();
-    schemaError.textContent = `Échec de l'enregistrement du champ : ${error.message}`;
-  }
-}
-
-async function handleDeleteField(fieldId) {
-  schemaError.textContent = '';
-  const previousSchema = schema;
-  schema = schema.filter((f) => f.id !== fieldId);
-  renderSchemaUI();
-  closeFieldEditor();
-  try {
-    await saveSchema(schema);
-  } catch (error) {
-    schema = previousSchema;
-    renderSchemaUI();
-    schemaError.textContent = `Échec de la suppression du champ : ${error.message}`;
-  }
-}
-
-initSchemaUI({ onSaveField: handleSaveField, onDeleteField: handleDeleteField });
-
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   authSection.hidden = connected;
   appShell.hidden = !connected;
   authStatus.textContent = connected ? 'Connecté à Google Drive.' : 'Non connecté.';
   entryError.textContent = '';
-  schemaError.textContent = '';
   settingsError.textContent = '';
   partageError.textContent = '';
   partagesRecusError.textContent = '';
+  modeleError.textContent = '';
 
   if (connected) {
     currentJournalId = getJournalIdFromUrl();
-    renderTableLoading(entryTableBody, 9);
+    renderTableLoading(entryTableBody, 6);
     renderLoading(partageList);
     renderLoading(partagesRecusList);
+    renderLoading(modeleList);
 
     try {
       settings = await loadSettings();
@@ -704,14 +917,6 @@ onAuthChange(async (token) => {
     }
     themeSelect.value = settings.theme ?? DEFAULT_THEME;
     applyTheme(settings.theme ?? DEFAULT_THEME);
-
-    try {
-      schema = await loadSchema();
-    } catch (error) {
-      schema = [];
-      schemaError.textContent = `Échec du chargement des champs personnalisés : ${error.message}`;
-    }
-    renderSchemaColumns(schema);
 
     try {
       entries = await loadEntries();
@@ -742,22 +947,32 @@ onAuthChange(async (token) => {
     }
     renderPartagesRecus();
 
+    try {
+      modeles = await loadModeles();
+    } catch (error) {
+      modeles = [];
+      modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
+    }
+    renderModeles();
+    renderEntryNewMenu();
+
     renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
     renderMainView();
   } else {
     entries = [];
     settings = {};
-    schema = [];
     partages = [];
     partagesRecus = [];
+    modeles = [];
     ownerName = null;
     currentJournalId = null;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
-    renderSchemaColumns(schema);
     renderEntries();
     renderPartages();
     renderPartagesRecus();
+    renderModeles();
+    renderEntryNewMenu();
     closeModal();
   }
 });

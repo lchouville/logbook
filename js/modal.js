@@ -3,11 +3,17 @@ const modalBackdrop = document.getElementById('modal-backdrop');
 const modalPanel = document.getElementById('modal-panel');
 const modalClose = document.getElementById('modal-close');
 
-const SECTION_IDS = ['entry-form-modal', 'settings', 'partages', 'partages-recus'];
+const SECTION_IDS = ['entry-form-modal', 'settings', 'partages', 'partages-recus', 'modeles'];
 const WIDE_SECTION_IDS = ['entry-form-modal'];
+const closeListeners = [];
+
+export function onModalClose(callback) {
+  closeListeners.push(callback);
+}
 
 export function closeModal() {
   modalRoot.hidden = true;
+  for (const callback of closeListeners) callback();
 }
 
 export function openModal(sectionId) {
