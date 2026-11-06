@@ -1,8 +1,10 @@
 const modalRoot = document.getElementById('modal-root');
 const modalBackdrop = document.getElementById('modal-backdrop');
+const modalPanel = document.getElementById('modal-panel');
 const modalClose = document.getElementById('modal-close');
 
 const SECTION_IDS = ['entry-form-modal', 'settings', 'partages', 'partages-recus'];
+const WIDE_SECTION_IDS = ['entry-form-modal'];
 
 export function closeModal() {
   modalRoot.hidden = true;
@@ -12,6 +14,7 @@ export function openModal(sectionId) {
   for (const id of SECTION_IDS) {
     document.getElementById(id).hidden = id !== sectionId;
   }
+  modalPanel.classList.toggle('modal-panel--wide', WIDE_SECTION_IDS.includes(sectionId));
   modalRoot.hidden = false;
 }
 
