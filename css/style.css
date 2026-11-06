@@ -514,6 +514,44 @@ form button[type="submit"] {
   white-space: nowrap;
 }
 
+#entry-table-body tr {
+  cursor: pointer;
+}
+
+#entry-table-body tr:hover {
+  background: var(--color-bg-hover);
+}
+
+#entry-table th[data-field-id],
+#entry-table th[data-add-field] button {
+  cursor: pointer;
+}
+
+#entry-table th[data-add-field] button {
+  background: transparent;
+  border-color: transparent;
+  padding: 0.125rem 0.5rem;
+}
+
+/* Popover d'édition d'un champ personnalisé */
+
+#schema-field-popover {
+  position: fixed;
+  z-index: 25;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  padding: 0.75rem;
+  width: 16rem;
+  box-sizing: border-box;
+}
+
+#schema-field-popover form button {
+  margin-top: 0.5rem;
+  margin-right: 0.5rem;
+}
+
 /* Modales */
 
 #modal-root {
@@ -548,6 +586,10 @@ form button[type="submit"] {
   border-top: none;
   padding-top: 0;
   margin-top: 0;
+}
+
+#modal-panel.modal-panel--wide {
+  max-width: 60rem;
 }
 
 #modal-close {

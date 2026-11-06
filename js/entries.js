@@ -4,7 +4,18 @@ export const THEMES = ['Relation', 'Santé', 'Travail', 'Trauma', 'Moral', 'Iden
 export const TYPES_JOURNEE = ['Ordinaire', 'Centrée sur le sujet', 'Exceptionnelle'];
 export const DELAI_RESSENTI_A_FROID_JOURS = 2;
 
-export function createEntry({ titre, date, themes, niveauAcces, statut, typeJournee, energie, ressenti, texte }) {
+export function createEntry({
+  titre,
+  date,
+  themes,
+  niveauAcces,
+  statut,
+  typeJournee,
+  energie,
+  ressenti,
+  texte,
+  champsPersonnalises = {},
+}) {
   return {
     id: crypto.randomUUID(),
     titre,
@@ -16,7 +27,22 @@ export function createEntry({ titre, date, themes, niveauAcces, statut, typeJour
     mesuresSoir: { energie, ressenti },
     ressentiAFroid: null,
     texte,
+    champsPersonnalises,
     creeLe: new Date().toISOString(),
+  };
+}
+
+export function updateEntry(entry, { titre, themes, niveauAcces, statut, typeJournee, energie, ressenti, texte, champsPersonnalises }) {
+  return {
+    ...entry,
+    titre,
+    themes,
+    niveauAcces,
+    statut,
+    typeJournee,
+    mesuresSoir: { energie, ressenti },
+    texte,
+    champsPersonnalises,
   };
 }
 
@@ -28,5 +54,7 @@ export function peutRemplirRessentiAFroid(entry, maintenant = new Date()) {
 }
 
 export function filtrerEntreesPartage(entries, regles) {
-  return entries.filter((entry) => entry.themes.some((theme) => regles[theme]?.includes(entry.niveauAcces)));
+  return entries
+    .filter((entry) => entry.themes.some((theme) => regles[theme]?.includes(entry.niveauAcces)))
+    .map(({ champsPersonnalises, ...rest }) => rest);
 }

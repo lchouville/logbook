@@ -4,6 +4,8 @@ import {
   saveEntries,
   loadSettings,
   saveSettings,
+  loadSchema,
+  saveSchema,
   loadPartages,
   savePartages,
   createSharedFile,
@@ -18,6 +20,7 @@ import {
 } from './drive.js';
 import {
   createEntry,
+  updateEntry,
   peutRemplirRessentiAFroid,
   filtrerEntreesPartage,
   NIVEAUX_ACCES,
@@ -29,6 +32,14 @@ import { applyTheme, DEFAULT_THEME } from './theme.js';
 import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
 import { openModal, closeModal } from './modal.js';
 import { renderJournalPartage } from './viewer.js';
+import {
+  initSchemaUI,
+  renderSchemaColumns,
+  renderCustomCells,
+  renderCustomFormFields,
+  readCustomFormValues,
+  closeFieldEditor,
+} from './schema.js';
 
 const authSection = document.getElementById('auth');
 const signInButton = document.getElementById('sign-in');
@@ -42,6 +53,8 @@ const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
 const entryNewButton = document.getElementById('entry-new-button');
 const entryForm = document.getElementById('entry-form');
+const entryFormTitle = document.getElementById('entry-form-title');
+const entrySubmitButton = document.getElementById('entry-submit');
 const entryTitre = document.getElementById('entry-titre');
 const entryThemes = document.getElementById('entry-themes');
 const entryNiveau = document.getElementById('entry-niveau');
@@ -50,8 +63,10 @@ const entryTypeJournee = document.getElementById('entry-type-journee');
 const entryEnergie = document.getElementById('entry-energie');
 const entryRessenti = document.getElementById('entry-ressenti');
 const entryTexte = document.getElementById('entry-texte');
+const entryCustomFieldsContainer = document.getElementById('entry-form-custom-fields');
 const entryTableBody = document.getElementById('entry-table-body');
 const entryError = document.getElementById('entry-error');
+const schemaError = document.getElementById('schema-error');
 const partageForm = document.getElementById('partage-form');
 const partageNom = document.getElementById('partage-nom');
 const partageEmail = document.getElementById('partage-email');
@@ -65,9 +80,11 @@ const partagesRecusError = document.getElementById('partages-recus-error');
 
 let entries = [];
 let settings = {};
+let schema = [];
 let partages = [];
 let partagesRecus = [];
 let editingPartageId = null;
+let editingEntryId = null;
 let ownerName = null;
 let currentJournalId = null;
 
@@ -247,6 +264,7 @@ function renderEntries() {
   entryTableBody.innerHTML = '';
   for (const entry of [...entries].reverse()) {
     const row = document.createElement('tr');
+    row.dataset.entryId = entry.id;
 
     appendCell(row, entry.date);
     appendCell(row, entry.titre ?? '');
@@ -266,9 +284,37 @@ function renderEntries() {
       froidCell.textContent = '—';
     }
     row.appendChild(froidCell);
+    renderCustomCells(row, entry, schema);
 
     entryTableBody.appendChild(row);
   }
+}
+
+function stopEditEntry() {
+  editingEntryId = null;
+  entryForm.reset();
+  entryCustomFieldsContainer.innerHTML = '';
+  entryFormTitle.textContent = 'Nouvelle entrée';
+  entrySubmitButton.textContent = 'Enregistrer';
+  entryError.textContent = '';
+}
+
+function startEditEntry(entry) {
+  closeFieldEditor();
+  editingEntryId = entry.id;
+  entryTitre.value = entry.titre ?? '';
+  for (const option of entryThemes.options) option.selected = entry.themes.includes(option.value);
+  entryNiveau.value = entry.niveauAcces;
+  entryStatut.value = entry.statut;
+  entryTypeJournee.value = entry.typeJournee;
+  entryEnergie.value = entry.mesuresSoir?.energie ?? '';
+  entryRessenti.value = entry.mesuresSoir?.ressenti ?? '';
+  entryTexte.value = entry.texte ?? '';
+  renderCustomFormFields(entryCustomFieldsContainer, schema, entry.champsPersonnalises);
+  entryFormTitle.textContent = entry.titre || 'Entrée';
+  entrySubmitButton.textContent = 'Enregistrer les modifications';
+  entryError.textContent = '';
+  openModal('entry-form-modal');
 }
 
 async function syncPartages() {
@@ -448,33 +494,61 @@ signInButton.addEventListener('click', signIn);
 signOutButton.addEventListener('click', signOut);
 
 entryNewButton.addEventListener('click', () => {
-  entryForm.reset();
-  entryError.textContent = '';
+  closeFieldEditor();
+  stopEditEntry();
+  renderCustomFormFields(entryCustomFieldsContainer, schema, {});
   openModal('entry-form-modal');
+});
+
+entryTableBody.addEventListener('click', (event) => {
+  if (event.target.closest('.ressenti-froid-form')) return;
+  const row = event.target.closest('tr');
+  const entry = row && entries.find((e) => e.id === row.dataset.entryId);
+  if (entry) startEditEntry(entry);
 });
 
 entryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   entryError.textContent = '';
   const themes = Array.from(entryThemes.selectedOptions).map((option) => option.value);
-  const entry = createEntry({
-    titre: entryTitre.value.trim(),
-    date: new Date().toISOString().slice(0, 10),
-    themes,
-    niveauAcces: entryNiveau.value,
-    statut: entryStatut.value,
-    typeJournee: entryTypeJournee.value,
-    energie: entryEnergie.valueAsNumber,
-    ressenti: entryRessenti.valueAsNumber,
-    texte: entryTexte.value,
-  });
+  const champsPersonnalises = readCustomFormValues(entryCustomFieldsContainer, schema);
   const previousEntries = entries;
-  entries = [...entries, entry];
+
+  if (editingEntryId) {
+    const original = entries.find((e) => e.id === editingEntryId);
+    const updated = updateEntry(original, {
+      titre: entryTitre.value.trim(),
+      themes,
+      niveauAcces: entryNiveau.value,
+      statut: entryStatut.value,
+      typeJournee: entryTypeJournee.value,
+      energie: entryEnergie.valueAsNumber,
+      ressenti: entryRessenti.valueAsNumber,
+      texte: entryTexte.value,
+      champsPersonnalises,
+    });
+    entries = entries.map((e) => (e.id === editingEntryId ? updated : e));
+  } else {
+    const entry = createEntry({
+      titre: entryTitre.value.trim(),
+      date: new Date().toISOString().slice(0, 10),
+      themes,
+      niveauAcces: entryNiveau.value,
+      statut: entryStatut.value,
+      typeJournee: entryTypeJournee.value,
+      energie: entryEnergie.valueAsNumber,
+      ressenti: entryRessenti.valueAsNumber,
+      texte: entryTexte.value,
+      champsPersonnalises,
+    });
+    entries = [...entries, entry];
+  }
+
   try {
     await saveEntries(entries);
     await syncPartages();
     renderEntries();
-    entryForm.reset();
+    stopEditEntry();
     closeModal();
   } catch (error) {
     entries = previousEntries;
@@ -566,12 +640,52 @@ function renderTableLoading(tbody, colspan) {
   tbody.appendChild(row);
 }
 
+function renderSchemaUI() {
+  renderSchemaColumns(schema);
+  renderEntries();
+}
+
+async function handleSaveField(existingId, { nom, type, options }) {
+  schemaError.textContent = '';
+  const previousSchema = schema;
+  schema = existingId
+    ? schema.map((f) => (f.id === existingId ? { ...f, nom, ...(f.type === 'select' ? { options } : {}) } : f))
+    : [...schema, { id: crypto.randomUUID(), nom, type, ...(type === 'select' ? { options } : {}) }];
+  renderSchemaUI();
+  closeFieldEditor();
+  try {
+    await saveSchema(schema);
+  } catch (error) {
+    schema = previousSchema;
+    renderSchemaUI();
+    schemaError.textContent = `Échec de l'enregistrement du champ : ${error.message}`;
+  }
+}
+
+async function handleDeleteField(fieldId) {
+  schemaError.textContent = '';
+  const previousSchema = schema;
+  schema = schema.filter((f) => f.id !== fieldId);
+  renderSchemaUI();
+  closeFieldEditor();
+  try {
+    await saveSchema(schema);
+  } catch (error) {
+    schema = previousSchema;
+    renderSchemaUI();
+    schemaError.textContent = `Échec de la suppression du champ : ${error.message}`;
+  }
+}
+
+initSchemaUI({ onSaveField: handleSaveField, onDeleteField: handleDeleteField });
+
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   authSection.hidden = connected;
   appShell.hidden = !connected;
   authStatus.textContent = connected ? 'Connecté à Google Drive.' : 'Non connecté.';
   entryError.textContent = '';
+  schemaError.textContent = '';
   settingsError.textContent = '';
   partageError.textContent = '';
   partagesRecusError.textContent = '';
@@ -590,6 +704,14 @@ onAuthChange(async (token) => {
     }
     themeSelect.value = settings.theme ?? DEFAULT_THEME;
     applyTheme(settings.theme ?? DEFAULT_THEME);
+
+    try {
+      schema = await loadSchema();
+    } catch (error) {
+      schema = [];
+      schemaError.textContent = `Échec du chargement des champs personnalisés : ${error.message}`;
+    }
+    renderSchemaColumns(schema);
 
     try {
       entries = await loadEntries();
@@ -625,12 +747,14 @@ onAuthChange(async (token) => {
   } else {
     entries = [];
     settings = {};
+    schema = [];
     partages = [];
     partagesRecus = [];
     ownerName = null;
     currentJournalId = null;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
+    renderSchemaColumns(schema);
     renderEntries();
     renderPartages();
     renderPartagesRecus();

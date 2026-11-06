@@ -5,6 +5,7 @@ const DATA_FOLDER_NAME = 'logbook';
 const PARTAGES_FOLDER_NAME = 'partages';
 const DATA_FILE_NAME = 'logbook-data.json';
 const SETTINGS_FILE_NAME = 'logbook-settings.json';
+const SCHEMA_FILE_NAME = 'logbook-schema.json';
 const PARTAGES_FILE_NAME = 'logbook-partages.json';
 const PARTAGES_RECUS_FILE_NAME = 'logbook-partages-recus.json';
 const PARTAGES_RECUS_FOLDER_NAME = 'partages-recus';
@@ -194,6 +195,14 @@ export async function loadSettings() {
 
 export async function saveSettings(settings) {
   return saveJsonFile(SETTINGS_FILE_NAME, settings, await getDataFolderId());
+}
+
+export async function loadSchema() {
+  return loadJsonFile(SCHEMA_FILE_NAME, [], await getDataFolderId());
+}
+
+export async function saveSchema(schema) {
+  return saveJsonFile(SCHEMA_FILE_NAME, schema, await getDataFolderId());
 }
 
 export async function loadPartages() {
