@@ -32,32 +32,34 @@
       <ul id="sidebar-journaux"></ul>
       <button id="sidebar-journaux-plus" type="button" hidden>Voir tout</button>
       <button id="sidebar-partage-button" type="button">Partage</button>
+      <button id="sidebar-modeles-button" type="button">Modèles</button>
     </nav>
     <main id="main-content">
       <section id="entries">
         <div id="entries-header">
           <h2>Entrées</h2>
-          <button id="entry-new-button" type="button">+ Nouvelle entrée</button>
+          <div id="entry-new-wrapper">
+            <button id="entry-new-button" type="button" aria-haspopup="true" aria-expanded="false">+ Nouvelle entrée</button>
+            <div id="entry-new-menu" hidden>
+              <button type="button" data-modele-id="">Entrée vierge</button>
+            </div>
+          </div>
         </div>
         <div class="table-wrapper" id="entry-table-wrapper">
           <table id="entry-table">
             <thead>
-              <tr id="entry-table-head-row">
+              <tr>
                 <th>Date</th>
                 <th>Titre</th>
                 <th>Thème(s)</th>
                 <th>Niveau</th>
                 <th>Statut</th>
-                <th>Énergie</th>
-                <th>Ressenti</th>
                 <th>Texte</th>
-                <th>Ressenti à froid</th>
               </tr>
             </thead>
             <tbody id="entry-table-body"></tbody>
           </table>
         </div>
-        <p id="schema-error" role="alert"></p>
       </section>
 
       <div id="schema-field-popover" hidden>
@@ -117,37 +119,62 @@
       <section id="entry-form-modal" hidden>
         <h2 id="entry-form-title">Nouvelle entrée</h2>
         <form id="entry-form">
-          <label for="entry-titre">Titre</label>
-          <input id="entry-titre" type="text" required>
+          <label for="entry-titre" class="sr-only">Titre</label>
+          <input id="entry-titre" type="text" class="entry-page-title" placeholder="Sans titre" required>
 
-          <label for="entry-themes">Thème(s)</label>
-          <select id="entry-themes" multiple required></select>
+          <div id="entry-properties">
+            <div class="entry-property-row">
+              <span class="entry-property-label">Date</span>
+              <span id="entry-date-display" class="entry-property-value"></span>
+            </div>
+          </div>
 
-          <label for="entry-niveau">Niveau d'accès</label>
-          <select id="entry-niveau" required>
-            <option value="" disabled selected>Choisir…</option>
-          </select>
+          <div id="entry-blocks-section" class="fields-editor-section">
+            <ul id="entry-blocks-list" class="fields-editor-list">
+              <li class="entry-block-row" draggable="true" data-order-key="themes">
+                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <label for="entry-themes">Thème(s)</label>
+                <select id="entry-themes" multiple required></select>
+              </li>
+              <li class="entry-block-row" draggable="true" data-order-key="niveau">
+                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <label for="entry-niveau">Niveau d'accès</label>
+                <select id="entry-niveau" required>
+                  <option value="" disabled selected>Choisir…</option>
+                </select>
+              </li>
+              <li class="entry-block-row" draggable="true" data-order-key="statut">
+                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <label for="entry-statut">Statut</label>
+                <select id="entry-statut" required>
+                  <option value="" disabled selected>Choisir…</option>
+                </select>
+              </li>
+              <li class="entry-block-row" draggable="true" data-order-key="typeJournee">
+                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <label for="entry-type-journee">Type de journée</label>
+                <select id="entry-type-journee" required>
+                  <option value="" disabled selected>Choisir…</option>
+                </select>
+              </li>
+              <li class="entry-block-row" draggable="true" data-order-key="energie">
+                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <label for="entry-energie">Énergie (0-10)</label>
+                <input id="entry-energie" type="number" min="0" max="10" step="0.5">
+              </li>
+              <li class="entry-block-row" draggable="true" data-order-key="ressenti">
+                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <label for="entry-ressenti">Ressenti (0-10)</label>
+                <input id="entry-ressenti" type="number" min="0" max="10" step="0.5">
+              </li>
+            </ul>
+            <button id="entry-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
+          </div>
 
-          <label for="entry-statut">Statut</label>
-          <select id="entry-statut" required>
-            <option value="" disabled selected>Choisir…</option>
-          </select>
-
-          <label for="entry-type-journee">Type de journée</label>
-          <select id="entry-type-journee" required>
-            <option value="" disabled selected>Choisir…</option>
-          </select>
-
-          <label for="entry-energie">Énergie (0-10)</label>
-          <input id="entry-energie" type="number" min="0" max="10" step="0.5">
-
-          <label for="entry-ressenti">Ressenti (0-10)</label>
-          <input id="entry-ressenti" type="number" min="0" max="10" step="0.5">
+          <div id="entry-ressenti-froid-slot" class="entry-property-row" hidden></div>
 
           <label for="entry-texte">Texte</label>
-          <textarea id="entry-texte" rows="4"></textarea>
-
-          <div id="entry-form-custom-fields"></div>
+          <textarea id="entry-texte" rows="8"></textarea>
 
           <button id="entry-submit" type="submit">Enregistrer</button>
         </form>
@@ -187,6 +214,59 @@
         <h2>Accès</h2>
         <p id="partages-recus-error" role="alert"></p>
         <ul id="partages-recus-list" class="card-list"></ul>
+      </section>
+      <section id="modeles" hidden>
+        <h2>Modèles</h2>
+        <form id="modele-form">
+          <label for="modele-nom">Nom</label>
+          <input id="modele-nom" type="text" required>
+
+          <div id="modele-fixed-fields">
+            <div class="entry-property-row">
+              <label for="modele-themes">Thème(s)</label>
+              <select id="modele-themes" multiple></select>
+            </div>
+            <div class="entry-property-row">
+              <label for="modele-niveau">Niveau d'accès</label>
+              <select id="modele-niveau">
+                <option value="">—</option>
+              </select>
+            </div>
+            <div class="entry-property-row">
+              <label for="modele-statut">Statut</label>
+              <select id="modele-statut">
+                <option value="">—</option>
+              </select>
+            </div>
+            <div class="entry-property-row">
+              <label for="modele-type-journee">Type de journée</label>
+              <select id="modele-type-journee">
+                <option value="">—</option>
+              </select>
+            </div>
+            <div class="entry-property-row">
+              <label for="modele-energie">Énergie (0-10)</label>
+              <input id="modele-energie" type="number" min="0" max="10" step="0.5">
+            </div>
+            <div class="entry-property-row">
+              <label for="modele-ressenti">Ressenti (0-10)</label>
+              <input id="modele-ressenti" type="number" min="0" max="10" step="0.5">
+            </div>
+          </div>
+
+          <div id="modele-blocks-section" class="fields-editor-section">
+            <ul id="modele-blocks-list" class="fields-editor-list"></ul>
+            <button id="modele-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
+          </div>
+
+          <label for="modele-texte">Texte</label>
+          <textarea id="modele-texte" rows="6"></textarea>
+
+          <button id="modele-submit" type="submit">Créer le modèle</button>
+          <button id="modele-cancel" type="button" hidden>Annuler</button>
+        </form>
+        <p id="modele-error" role="alert"></p>
+        <ul id="modele-list" class="card-list"></ul>
       </section>
     </div>
   </div>
