@@ -40,7 +40,9 @@ const themeSelect = document.getElementById('theme-select');
 const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
+const entryNewButton = document.getElementById('entry-new-button');
 const entryForm = document.getElementById('entry-form');
+const entryTitre = document.getElementById('entry-titre');
 const entryThemes = document.getElementById('entry-themes');
 const entryNiveau = document.getElementById('entry-niveau');
 const entryStatut = document.getElementById('entry-statut');
@@ -48,7 +50,7 @@ const entryTypeJournee = document.getElementById('entry-type-journee');
 const entryEnergie = document.getElementById('entry-energie');
 const entryRessenti = document.getElementById('entry-ressenti');
 const entryTexte = document.getElementById('entry-texte');
-const entryList = document.getElementById('entry-list');
+const entryTableBody = document.getElementById('entry-table-body');
 const entryError = document.getElementById('entry-error');
 const partageForm = document.getElementById('partage-form');
 const partageNom = document.getElementById('partage-nom');
@@ -234,24 +236,38 @@ function stopEditPartage() {
   partageCancel.hidden = true;
 }
 
+function appendCell(row, text) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  row.appendChild(td);
+  return td;
+}
+
 function renderEntries() {
-  entryList.innerHTML = '';
+  entryTableBody.innerHTML = '';
   for (const entry of [...entries].reverse()) {
-    const li = document.createElement('li');
+    const row = document.createElement('tr');
 
-    const summary = document.createElement('p');
-    summary.textContent = `${entry.date} — ${entry.themes.join(', ')} (${entry.niveauAcces}, ${entry.statut})`;
-    li.appendChild(summary);
+    appendCell(row, entry.date);
+    appendCell(row, entry.titre ?? '');
+    appendCell(row, entry.themes.join(', '));
+    appendCell(row, entry.niveauAcces);
+    appendCell(row, entry.statut);
+    appendCell(row, entry.mesuresSoir?.energie ?? '—');
+    appendCell(row, entry.mesuresSoir?.ressenti ?? '—');
+    appendCell(row, entry.texte ?? '');
 
+    const froidCell = document.createElement('td');
     if (entry.ressentiAFroid != null) {
-      const froid = document.createElement('p');
-      froid.textContent = `Ressenti à froid : ${entry.ressentiAFroid}/10`;
-      li.appendChild(froid);
+      froidCell.textContent = `${entry.ressentiAFroid}/10`;
     } else if (peutRemplirRessentiAFroid(entry)) {
-      li.appendChild(buildRessentiAFroidForm(entry));
+      froidCell.appendChild(buildRessentiAFroidForm(entry));
+    } else {
+      froidCell.textContent = '—';
     }
+    row.appendChild(froidCell);
 
-    entryList.appendChild(li);
+    entryTableBody.appendChild(row);
   }
 }
 
@@ -431,11 +447,18 @@ initSidebar({
 signInButton.addEventListener('click', signIn);
 signOutButton.addEventListener('click', signOut);
 
+entryNewButton.addEventListener('click', () => {
+  entryForm.reset();
+  entryError.textContent = '';
+  openModal('entry-form-modal');
+});
+
 entryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   entryError.textContent = '';
   const themes = Array.from(entryThemes.selectedOptions).map((option) => option.value);
   const entry = createEntry({
+    titre: entryTitre.value.trim(),
     date: new Date().toISOString().slice(0, 10),
     themes,
     niveauAcces: entryNiveau.value,
@@ -452,6 +475,7 @@ entryForm.addEventListener('submit', async (event) => {
     await syncPartages();
     renderEntries();
     entryForm.reset();
+    closeModal();
   } catch (error) {
     entries = previousEntries;
     entryError.textContent = `Échec de l'enregistrement : ${error.message}`;
@@ -532,6 +556,16 @@ function renderLoading(list) {
   list.appendChild(li);
 }
 
+function renderTableLoading(tbody, colspan) {
+  tbody.innerHTML = '';
+  const row = document.createElement('tr');
+  const td = document.createElement('td');
+  td.colSpan = colspan;
+  td.textContent = 'Chargement…';
+  row.appendChild(td);
+  tbody.appendChild(row);
+}
+
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   authSection.hidden = connected;
@@ -544,7 +578,7 @@ onAuthChange(async (token) => {
 
   if (connected) {
     currentJournalId = getJournalIdFromUrl();
-    renderLoading(entryList);
+    renderTableLoading(entryTableBody, 9);
     renderLoading(partageList);
     renderLoading(partagesRecusList);
 
