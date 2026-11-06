@@ -10,6 +10,7 @@ const sidebarSettingsButton = document.getElementById('sidebar-settings-button')
 const sidebarJournaux = document.getElementById('sidebar-journaux');
 const sidebarJournauxPlus = document.getElementById('sidebar-journaux-plus');
 const sidebarPartageButton = document.getElementById('sidebar-partage-button');
+const sidebarModelesButton = document.getElementById('sidebar-modeles-button');
 
 function closeProfileMenu() {
   sidebarProfileMenu.hidden = true;
@@ -62,9 +63,10 @@ export function closeSidebarOnMobile() {
   }
 }
 
-export function initSidebar({ onSelectJournal, onOpenSettings, onOpenPartages, onOpenAcces }) {
+export function initSidebar({ onSelectJournal, onOpenSettings, onOpenPartages, onOpenAcces, onOpenModeles }) {
   sidebarSettingsButton.addEventListener('click', onOpenSettings);
   sidebarPartageButton.addEventListener('click', onOpenPartages);
+  sidebarModelesButton.addEventListener('click', onOpenModeles);
   sidebarJournauxPlus.addEventListener('click', onOpenAcces);
   sidebarJournaux.addEventListener('click', (event) => {
     const button = event.target.closest('button');
