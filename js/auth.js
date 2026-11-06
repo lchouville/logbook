@@ -5,10 +5,17 @@ const SIGNED_OUT_KEY = 'logbook_signed_out';
 
 let tokenClient = null;
 let accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY) || null;
+let refreshPromise = null;
 const changeListeners = [];
+const pendingTokenResolvers = [];
 
 function notifyChange() {
   for (const listener of changeListeners) listener(accessToken);
+}
+
+function settlePendingTokenRequests(token) {
+  const resolvers = pendingTokenResolvers.splice(0);
+  for (const resolve of resolvers) resolve(token);
 }
 
 function waitForGoogleIdentity() {
@@ -38,10 +45,50 @@ async function getTokenClient() {
         sessionStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
         localStorage.removeItem(SIGNED_OUT_KEY);
         notifyChange();
+        settlePendingTokenRequests(accessToken);
+      } else {
+        settlePendingTokenRequests(null);
       }
+    },
+    error_callback: () => {
+      settlePendingTokenRequests(null);
     },
   });
   return tokenClient;
+}
+
+// Renouvelle le token en arrière-plan (sans écran de consentement) quand un
+// appel Drive renvoie 401 — le token GIS expire après ~1h et rien d'autre ne
+// le détecte, ce qui laissait l'utilisateur "connecté" en apparence mais en
+// échec sur chaque appel tant qu'il ne se déconnectait/reconnectait pas à la
+// main. Repose sur la session Google du navigateur, pas sur le token expiré,
+// donc fonctionne même longtemps après l'expiration.
+export async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = requestSilentToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+async function requestSilentToken() {
+  const client = await getTokenClient();
+  const token = await new Promise((resolve) => {
+    pendingTokenResolvers.push(resolve);
+    client.requestAccessToken({ prompt: '' });
+    setTimeout(() => resolve(null), 10000);
+  });
+  if (!token) {
+    // Rafraîchissement impossible (session Google elle-même expirée) :
+    // on efface le token mort sans marquer de déconnexion explicite, pour
+    // que la tentative de reconnexion silencieuse au prochain chargement
+    // de page (voir plus bas) reste active.
+    accessToken = null;
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    notifyChange();
+  }
+  return token;
 }
 
 export function onAuthChange(listener) {
