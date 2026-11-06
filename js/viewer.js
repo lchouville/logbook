@@ -10,37 +10,44 @@ import { pickSharedFile } from './picker.js';
 
 const viewerGrantAccess = document.getElementById('viewer-grant-access');
 const viewerError = document.getElementById('viewer-error');
-const viewerList = document.getElementById('viewer-list');
+const viewerTableBody = document.getElementById('viewer-table-body');
 
 let currentFileId = null;
 let currentOnPartagesRecusChanged = null;
 
+function appendCell(row, text) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  row.appendChild(td);
+  return td;
+}
+
+function renderViewerLoading() {
+  viewerTableBody.innerHTML = '';
+  const row = document.createElement('tr');
+  const td = document.createElement('td');
+  td.colSpan = 9;
+  td.textContent = 'Chargement…';
+  row.appendChild(td);
+  viewerTableBody.appendChild(row);
+}
+
 function renderViewerEntries(entries) {
-  viewerList.innerHTML = '';
+  viewerTableBody.innerHTML = '';
   for (const entry of [...entries].reverse()) {
-    const li = document.createElement('li');
+    const row = document.createElement('tr');
 
-    const summary = document.createElement('p');
-    summary.textContent = `${entry.date} — ${entry.themes.join(', ')} (${entry.niveauAcces}, ${entry.statut})`;
-    li.appendChild(summary);
+    appendCell(row, entry.date);
+    appendCell(row, entry.titre ?? '');
+    appendCell(row, entry.themes.join(', '));
+    appendCell(row, entry.niveauAcces);
+    appendCell(row, entry.statut);
+    appendCell(row, entry.mesuresSoir?.energie ?? '—');
+    appendCell(row, entry.mesuresSoir?.ressenti ?? '—');
+    appendCell(row, entry.texte ?? '');
+    appendCell(row, entry.ressentiAFroid != null ? `${entry.ressentiAFroid}/10` : '—');
 
-    const mesures = document.createElement('p');
-    mesures.textContent = `Énergie ${entry.mesuresSoir?.energie ?? '—'}/10, ressenti ${entry.mesuresSoir?.ressenti ?? '—'}/10`;
-    li.appendChild(mesures);
-
-    if (entry.texte) {
-      const texte = document.createElement('p');
-      texte.textContent = entry.texte;
-      li.appendChild(texte);
-    }
-
-    if (entry.ressentiAFroid != null) {
-      const froid = document.createElement('p');
-      froid.textContent = `Ressenti à froid : ${entry.ressentiAFroid}/10`;
-      li.appendChild(froid);
-    }
-
-    viewerList.appendChild(li);
+    viewerTableBody.appendChild(row);
   }
 }
 
@@ -77,10 +84,7 @@ export async function renderJournalPartage(fileId, onPartagesRecusChanged) {
   currentOnPartagesRecusChanged = onPartagesRecusChanged;
 
   viewerError.textContent = '';
-  viewerList.innerHTML = '';
-  const loading = document.createElement('li');
-  loading.textContent = 'Chargement…';
-  viewerList.appendChild(loading);
+  renderViewerLoading();
 
   try {
     const entries = await loadSharedFile(fileId);
@@ -88,7 +92,7 @@ export async function renderJournalPartage(fileId, onPartagesRecusChanged) {
     renderViewerEntries(entries);
     await recordPartageRecu(fileId, onPartagesRecusChanged);
   } catch (error) {
-    viewerList.innerHTML = '';
+    viewerTableBody.innerHTML = '';
     viewerGrantAccess.hidden = false;
     viewerError.textContent = `Accès au journal partagé impossible pour l'instant (${error.message}). Donne l'accès via le bouton ci-dessous.`;
   }

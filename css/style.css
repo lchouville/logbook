@@ -435,7 +435,7 @@ form button[type="submit"] {
   flex: 1;
   margin-left: 16rem;
   padding: 2rem 1.5rem;
-  max-width: 40rem;
+  max-width: 75rem;
   box-sizing: border-box;
   transition: margin-left 0.2s ease;
 }
@@ -459,6 +459,59 @@ form button[type="submit"] {
   #main-content {
     margin-left: 0;
   }
+}
+
+/* Tableau d'entrées */
+
+#entries-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+#entries-header h2 {
+  margin: 0;
+}
+
+#entry-new-button {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-fg);
+  white-space: nowrap;
+}
+
+#entry-new-button:hover {
+  opacity: 0.9;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+#entry-table,
+#viewer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+#entry-table th,
+#entry-table td,
+#viewer-table th,
+#viewer-table td {
+  text-align: left;
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+#entry-table th,
+#viewer-table th {
+  color: var(--color-fg-secondary);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* Modales */
