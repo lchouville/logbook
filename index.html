@@ -39,10 +39,10 @@
           <h2>Entrées</h2>
           <button id="entry-new-button" type="button">+ Nouvelle entrée</button>
         </div>
-        <div class="table-wrapper">
+        <div class="table-wrapper" id="entry-table-wrapper">
           <table id="entry-table">
             <thead>
-              <tr>
+              <tr id="entry-table-head-row">
                 <th>Date</th>
                 <th>Titre</th>
                 <th>Thème(s)</th>
@@ -57,7 +57,33 @@
             <tbody id="entry-table-body"></tbody>
           </table>
         </div>
+        <p id="schema-error" role="alert"></p>
       </section>
+
+      <div id="schema-field-popover" hidden>
+        <form id="schema-field-form">
+          <label for="schema-field-nom">Nom</label>
+          <input id="schema-field-nom" type="text" required>
+
+          <p id="schema-field-type-readonly" hidden></p>
+
+          <label for="schema-field-type">Type</label>
+          <select id="schema-field-type">
+            <option value="texte">Texte</option>
+            <option value="nombre">Nombre</option>
+            <option value="date">Date</option>
+            <option value="select">Liste</option>
+            <option value="case">Case à cocher</option>
+          </select>
+
+          <label for="schema-field-options">Options (séparées par des virgules)</label>
+          <input id="schema-field-options" type="text" hidden>
+
+          <button type="submit">Enregistrer</button>
+          <button id="schema-field-delete" type="button" hidden>Supprimer</button>
+        </form>
+      </div>
+
       <section id="journal-partage" hidden>
         <h2>Entrées</h2>
         <button id="viewer-grant-access" type="button" hidden>Donner l'accès au fichier partagé</button>
@@ -89,7 +115,7 @@
     <div id="modal-panel" role="dialog" aria-modal="true">
       <button id="modal-close" type="button" aria-label="Fermer">×</button>
       <section id="entry-form-modal" hidden>
-        <h2>Nouvelle entrée</h2>
+        <h2 id="entry-form-title">Nouvelle entrée</h2>
         <form id="entry-form">
           <label for="entry-titre">Titre</label>
           <input id="entry-titre" type="text" required>
@@ -121,7 +147,9 @@
           <label for="entry-texte">Texte</label>
           <textarea id="entry-texte" rows="4"></textarea>
 
-          <button type="submit">Enregistrer</button>
+          <div id="entry-form-custom-fields"></div>
+
+          <button id="entry-submit" type="submit">Enregistrer</button>
         </form>
         <p id="entry-error" role="alert"></p>
       </section>
