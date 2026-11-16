@@ -23,6 +23,10 @@ import {
   updateEntry,
   peutRemplirRessentiAFroid,
   filtrerEntreesPartage,
+  blankContenuSchema,
+  migrateEntryContenu,
+  migrateModeleContenu,
+  previewContenuTexte,
   NIVEAUX_ACCES,
   STATUTS,
   THEMES,
@@ -34,6 +38,7 @@ import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
 import { openModal, closeModal } from './modal.js';
 import { renderJournalPartage } from './viewer.js';
 import { createFieldsEditor } from './schema.js';
+import { createContentEditor } from './contenu.js';
 
 const authSection = document.getElementById('auth');
 const signInButton = document.getElementById('sign-in');
@@ -57,7 +62,9 @@ const entryStatut = document.getElementById('entry-statut');
 const entryTypeJournee = document.getElementById('entry-type-journee');
 const entryEnergie = document.getElementById('entry-energie');
 const entryRessenti = document.getElementById('entry-ressenti');
-const entryTexte = document.getElementById('entry-texte');
+const entryContenuList = document.getElementById('entry-contenu-list');
+const entryContenuAddTexte = document.getElementById('entry-contenu-add-texte');
+const entryContenuAddTableau = document.getElementById('entry-contenu-add-tableau');
 const entryDateDisplay = document.getElementById('entry-date-display');
 const entryRessentiFroidSlot = document.getElementById('entry-ressenti-froid-slot');
 const entryBlocksList = document.getElementById('entry-blocks-list');
@@ -82,7 +89,9 @@ const modeleStatut = document.getElementById('modele-statut');
 const modeleTypeJournee = document.getElementById('modele-type-journee');
 const modeleEnergie = document.getElementById('modele-energie');
 const modeleRessenti = document.getElementById('modele-ressenti');
-const modeleTexte = document.getElementById('modele-texte');
+const modeleContenuList = document.getElementById('modele-contenu-list');
+const modeleContenuAddTexte = document.getElementById('modele-contenu-add-texte');
+const modeleContenuAddTableau = document.getElementById('modele-contenu-add-tableau');
 const modeleBlocksList = document.getElementById('modele-blocks-list');
 const modeleAddFieldButton = document.getElementById('modele-add-field-button');
 const modeleSubmit = document.getElementById('modele-submit');
@@ -97,6 +106,7 @@ let partagesRecus = [];
 let modeles = [];
 let editingPartageId = null;
 let editingEntryId = null;
+let editingEntryModeleId = null;
 let editingModeleId = null;
 let ownerName = null;
 let currentJournalId = null;
@@ -164,6 +174,18 @@ const modeleFieldsEditor = createFieldsEditor({
   listEl: modeleBlocksList,
   addButtonEl: modeleAddFieldButton,
   idPrefix: 'modele-field',
+});
+const entryContentEditor = createContentEditor({
+  listEl: entryContenuList,
+  addTexteButtonEl: entryContenuAddTexte,
+  addTableauButtonEl: entryContenuAddTableau,
+  idPrefix: 'entry-contenu',
+});
+const modeleContentEditor = createContentEditor({
+  listEl: modeleContenuList,
+  addTexteButtonEl: modeleContenuAddTexte,
+  addTableauButtonEl: modeleContenuAddTableau,
+  idPrefix: 'modele-contenu',
 });
 
 function buildRessentiAFroidForm(entry) {
@@ -330,7 +352,7 @@ function renderEntries() {
     appendCell(row, entry.themes.join(', '));
     appendCell(row, entry.niveauAcces);
     appendCell(row, entry.statut);
-    appendCell(row, entry.texte ?? '');
+    appendCell(row, previewContenuTexte(entry));
 
     entryTableBody.appendChild(row);
   }
@@ -338,6 +360,7 @@ function renderEntries() {
 
 function stopEditEntry() {
   editingEntryId = null;
+  editingEntryModeleId = null;
   entryForm.reset();
   entryRessentiFroidSlot.hidden = true;
   entryRessentiFroidSlot.innerHTML = '';
@@ -354,7 +377,6 @@ function applyFixedFieldsToForm(fields, els) {
   els.typeJournee.value = fields.typeJournee ?? '';
   els.energie.value = fields.energie ?? fields.mesuresSoir?.energie ?? '';
   els.ressenti.value = fields.ressenti ?? fields.mesuresSoir?.ressenti ?? '';
-  els.texte.value = fields.texte ?? '';
 }
 
 const entryFixedFieldEls = {
@@ -364,17 +386,18 @@ const entryFixedFieldEls = {
   typeJournee: entryTypeJournee,
   energie: entryEnergie,
   ressenti: entryRessenti,
-  texte: entryTexte,
 };
 
 function startEditEntry(entry) {
   editingEntryId = entry.id;
+  editingEntryModeleId = entry.modeleId ?? null;
   entryTitre.value = entry.titre ?? '';
   applyFixedFieldsToForm(entry, entryFixedFieldEls);
   entryDateDisplay.textContent = entry.date;
   entryRessentiFroidSlot.hidden = false;
   renderRessentiAFroidSlot(entry);
   entryFieldsEditor.render(entry.champsSchema ?? blankChampsSchema(), entry.champsPersonnalises ?? {});
+  entryContentEditor.render(entry.contenuSchema, entry.contenuValeurs ?? {}, Boolean(entry.modeleId));
   entryFormTitle.textContent = 'Modifier l’entrée';
   entrySubmitButton.textContent = 'Enregistrer les modifications';
   entryError.textContent = '';
@@ -384,11 +407,24 @@ function startEditEntry(entry) {
 function openBlankEntryForm() {
   stopEditEntry();
   entryFieldsEditor.render(blankChampsSchema(), {});
+  entryContentEditor.render(blankContenuSchema(), {}, false);
   openModal('entry-form-modal');
+}
+
+function cloneContenuSchema(schema) {
+  return {
+    blocks: schema.blocks.map((block) => ({
+      ...block,
+      colonnes: block.colonnes?.map((c) => ({ ...c })),
+      lignes: block.lignes?.map((l) => ({ ...l })),
+    })),
+    order: [...schema.order],
+  };
 }
 
 function applyModeleToForm(modele) {
   stopEditEntry();
+  editingEntryModeleId = modele.id;
   applyFixedFieldsToForm(modele, entryFixedFieldEls);
   const modeleSchema = modele.champsSchema ?? { fields: [], order: [] };
   entryFieldsEditor.render(
@@ -397,6 +433,11 @@ function applyModeleToForm(modele) {
       order: [...FIXED_BLOCK_KEYS, ...modeleSchema.order],
     },
     { ...(modele.champsPersonnalises ?? {}) },
+  );
+  entryContentEditor.render(
+    cloneContenuSchema(modele.contenuSchema),
+    { ...(modele.contenuValeursParDefaut ?? {}) },
+    true,
   );
   openModal('entry-form-modal');
 }
@@ -539,7 +580,6 @@ function readModeleFixedFields() {
     typeJournee: modeleTypeJournee.value,
     energie: modeleEnergie.valueAsNumber,
     ressenti: modeleRessenti.valueAsNumber,
-    texte: modeleTexte.value,
   };
 }
 
@@ -550,7 +590,6 @@ const modeleFixedFieldEls = {
   typeJournee: modeleTypeJournee,
   energie: modeleEnergie,
   ressenti: modeleRessenti,
-  texte: modeleTexte,
 };
 
 function startEditModele(modele) {
@@ -558,6 +597,7 @@ function startEditModele(modele) {
   modeleNom.value = modele.nom;
   applyFixedFieldsToForm(modele, modeleFixedFieldEls);
   modeleFieldsEditor.render(modele.champsSchema ?? { fields: [], order: [] }, modele.champsPersonnalises ?? {});
+  modeleContentEditor.render(modele.contenuSchema, modele.contenuValeursParDefaut ?? {}, false);
   modeleSubmit.textContent = 'Enregistrer les modifications';
   modeleCancel.hidden = false;
   modeleError.textContent = '';
@@ -567,6 +607,7 @@ function stopEditModele() {
   editingModeleId = null;
   modeleForm.reset();
   modeleFieldsEditor.render({ fields: [], order: [] }, {});
+  modeleContentEditor.render(blankContenuSchema(), {}, false);
   modeleSubmit.textContent = 'Créer le modèle';
   modeleCancel.hidden = true;
 }
@@ -626,14 +667,29 @@ modeleForm.addEventListener('submit', async (event) => {
   const fixed = readModeleFixedFields();
   const champsPersonnalises = modeleFieldsEditor.getValues();
   const champsSchema = modeleFieldsEditor.getSchema();
+  const contenuSchema = modeleContentEditor.getSchema();
+  const contenuValeursParDefaut = modeleContentEditor.getValues();
   const previousModeles = modeles;
 
   if (editingModeleId) {
-    modeles = modeles.map((m) => (m.id === editingModeleId ? { ...m, nom, ...fixed, champsPersonnalises, champsSchema } : m));
+    modeles = modeles.map((m) =>
+      m.id === editingModeleId
+        ? { ...m, nom, ...fixed, champsPersonnalises, champsSchema, contenuSchema, contenuValeursParDefaut }
+        : m,
+    );
   } else {
     modeles = [
       ...modeles,
-      { id: crypto.randomUUID(), nom, ...fixed, champsPersonnalises, champsSchema, creeLe: new Date().toISOString() },
+      {
+        id: crypto.randomUUID(),
+        nom,
+        ...fixed,
+        champsPersonnalises,
+        champsSchema,
+        contenuSchema,
+        contenuValeursParDefaut,
+        creeLe: new Date().toISOString(),
+      },
     ];
   }
   renderModeles();
@@ -761,6 +817,8 @@ entryForm.addEventListener('submit', async (event) => {
   const themes = Array.from(entryThemes.selectedOptions).map((option) => option.value);
   const champsPersonnalises = entryFieldsEditor.getValues();
   const champsSchema = entryFieldsEditor.getSchema();
+  const contenuSchema = entryContentEditor.getSchema();
+  const contenuValeurs = entryContentEditor.getValues();
   const previousEntries = entries;
 
   if (editingEntryId) {
@@ -773,9 +831,10 @@ entryForm.addEventListener('submit', async (event) => {
       typeJournee: entryTypeJournee.value,
       energie: entryEnergie.valueAsNumber,
       ressenti: entryRessenti.valueAsNumber,
-      texte: entryTexte.value,
       champsPersonnalises,
       champsSchema,
+      contenuSchema,
+      contenuValeurs,
     });
     entries = entries.map((e) => (e.id === editingEntryId ? updated : e));
   } else {
@@ -788,9 +847,11 @@ entryForm.addEventListener('submit', async (event) => {
       typeJournee: entryTypeJournee.value,
       energie: entryEnergie.valueAsNumber,
       ressenti: entryRessenti.valueAsNumber,
-      texte: entryTexte.value,
       champsPersonnalises,
       champsSchema,
+      modeleId: editingEntryModeleId,
+      contenuSchema,
+      contenuValeurs,
     });
     entries = [...entries, entry];
   }
@@ -919,7 +980,7 @@ onAuthChange(async (token) => {
     applyTheme(settings.theme ?? DEFAULT_THEME);
 
     try {
-      entries = await loadEntries();
+      entries = (await loadEntries()).map(migrateEntryContenu);
     } catch (error) {
       entries = [];
       entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
@@ -948,7 +1009,7 @@ onAuthChange(async (token) => {
     renderPartagesRecus();
 
     try {
-      modeles = await loadModeles();
+      modeles = (await loadModeles()).map(migrateModeleContenu);
     } catch (error) {
       modeles = [];
       modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;

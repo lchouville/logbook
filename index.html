@@ -173,8 +173,14 @@
 
           <div id="entry-ressenti-froid-slot" class="entry-property-row" hidden></div>
 
-          <label for="entry-texte">Texte</label>
-          <textarea id="entry-texte" rows="8"></textarea>
+          <div id="entry-contenu-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Contenu</h3>
+            <div id="entry-contenu-list" class="contenu-list"></div>
+            <div class="contenu-add-buttons">
+              <button id="entry-contenu-add-texte" type="button">+ Bloc texte</button>
+              <button id="entry-contenu-add-tableau" type="button">+ Bloc tableau</button>
+            </div>
+          </div>
 
           <button id="entry-submit" type="submit">Enregistrer</button>
         </form>
@@ -259,8 +265,14 @@
             <button id="modele-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
           </div>
 
-          <label for="modele-texte">Texte</label>
-          <textarea id="modele-texte" rows="6"></textarea>
+          <div id="modele-contenu-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Contenu</h3>
+            <div id="modele-contenu-list" class="contenu-list"></div>
+            <div class="contenu-add-buttons">
+              <button id="modele-contenu-add-texte" type="button">+ Bloc texte</button>
+              <button id="modele-contenu-add-tableau" type="button">+ Bloc tableau</button>
+            </div>
+          </div>
 
           <button id="modele-submit" type="submit">Créer le modèle</button>
           <button id="modele-cancel" type="button" hidden>Annuler</button>

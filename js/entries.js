@@ -5,6 +5,59 @@ export const TYPES_JOURNEE = ['Ordinaire', 'Centrée sur le sujet', 'Exceptionne
 export const DELAI_RESSENTI_A_FROID_JOURS = 2;
 export const FIXED_BLOCK_KEYS = ['themes', 'niveau', 'statut', 'typeJournee', 'energie', 'ressenti'];
 
+export function createTexteBlock(titre = 'Texte') {
+  return { id: crypto.randomUUID(), type: 'texte', titre };
+}
+
+export function createTableauBlock(titre = 'Tableau de mesures') {
+  return {
+    id: crypto.randomUUID(),
+    type: 'tableau',
+    titre,
+    colonnes: [{ id: crypto.randomUUID(), nom: 'Valeur' }],
+    lignes: [],
+  };
+}
+
+export function blankContenuSchema() {
+  const block = createTexteBlock();
+  return { blocks: [block], order: [block.id] };
+}
+
+function legacyContenuSchema() {
+  const blockId = 'legacy-texte';
+  return { blocks: [{ id: blockId, type: 'texte', titre: 'Texte' }], order: [blockId] };
+}
+
+// Les entrées/modèles créés avant l'introduction du Contenu structuré en
+// blocs n'ont qu'un champ `texte` plat : on le présente comme un unique
+// bloc texte, sans réécrire les données existantes sur Drive.
+export function migrateEntryContenu(entry) {
+  if (entry.contenuSchema) return entry;
+  return {
+    ...entry,
+    modeleId: entry.modeleId ?? null,
+    contenuSchema: legacyContenuSchema(),
+    contenuValeurs: { 'legacy-texte': entry.texte ?? '' },
+  };
+}
+
+export function migrateModeleContenu(modele) {
+  if (modele.contenuSchema) return modele;
+  return {
+    ...modele,
+    contenuSchema: legacyContenuSchema(),
+    contenuValeursParDefaut: { 'legacy-texte': modele.texte ?? '' },
+  };
+}
+
+export function previewContenuTexte(entry) {
+  const texteBlockId = entry.contenuSchema.order.find(
+    (id) => entry.contenuSchema.blocks.find((b) => b.id === id)?.type === 'texte',
+  );
+  return texteBlockId ? (entry.contenuValeurs[texteBlockId] ?? '') : '';
+}
+
 export function createEntry({
   titre,
   date,
@@ -14,9 +67,11 @@ export function createEntry({
   typeJournee,
   energie,
   ressenti,
-  texte,
   champsPersonnalises = {},
   champsSchema = { fields: [], order: [...FIXED_BLOCK_KEYS] },
+  modeleId = null,
+  contenuSchema = blankContenuSchema(),
+  contenuValeurs = {},
 }) {
   return {
     id: crypto.randomUUID(),
@@ -28,16 +83,18 @@ export function createEntry({
     typeJournee,
     mesuresSoir: { energie, ressenti },
     ressentiAFroid: null,
-    texte,
     champsPersonnalises,
     champsSchema,
+    modeleId,
+    contenuSchema,
+    contenuValeurs,
     creeLe: new Date().toISOString(),
   };
 }
 
 export function updateEntry(
   entry,
-  { titre, themes, niveauAcces, statut, typeJournee, energie, ressenti, texte, champsPersonnalises, champsSchema },
+  { titre, themes, niveauAcces, statut, typeJournee, energie, ressenti, champsPersonnalises, champsSchema, contenuSchema, contenuValeurs },
 ) {
   return {
     ...entry,
@@ -47,9 +104,10 @@ export function updateEntry(
     statut,
     typeJournee,
     mesuresSoir: { energie, ressenti },
-    texte,
     champsPersonnalises,
     champsSchema,
+    contenuSchema,
+    contenuValeurs,
   };
 }
 
