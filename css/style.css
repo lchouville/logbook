@@ -6,11 +6,11 @@
   --color-bg-secondary: #f7f7f5;
   --color-bg-hover: #efefed;
   --color-fg: #37352f;
-  --color-fg-secondary: #787774;
+  --color-fg-secondary: #6f6d66;
   --color-border: #e9e9e7;
-  --color-accent: #2383e2;
+  --color-accent: #1a6dc4;
   --color-accent-fg: #ffffff;
-  --color-danger: #eb5757;
+  --color-danger: #cc3a3a;
   --radius: 6px;
   --radius-sm: 4px;
   --shadow-card: 0 1px 2px rgba(15, 15, 15, 0.1);
@@ -46,6 +46,28 @@
 
 * {
   box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+.skip-link {
+  position: absolute;
+  top: -3rem;
+  left: 1rem;
+  z-index: 40;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  transition: top 0.1s ease;
+}
+
+.skip-link:focus-visible {
+  top: 1rem;
 }
 
 /* Guarantees the hidden attribute always wins over any element's own
@@ -121,6 +143,16 @@ button[type="submit"] {
 
 button[type="submit"]:hover {
   opacity: 0.9;
+}
+
+.button-danger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.button-danger:hover {
+  background: var(--color-danger);
+  color: var(--color-accent-fg);
 }
 
 select,
@@ -293,6 +325,24 @@ form button[type="submit"] {
   min-height: 100vh;
 }
 
+#sidebar-toggle,
+#modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  border-color: transparent;
+}
+
+#sidebar-toggle:hover,
+#modal-close:hover {
+  background: var(--color-bg-hover);
+}
+
 #sidebar-toggle {
   position: fixed;
   top: 1rem;
@@ -346,13 +396,20 @@ form button[type="submit"] {
   height: 1.75rem;
   border-radius: 50%;
   background: var(--color-accent);
-  color: var(--color-accent-fg);
+  color: #ffffff;
   font-size: 0.8125rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
+#sidebar-owner-avatar.avatar-color-0 { background: #9c3b3b; }
+#sidebar-owner-avatar.avatar-color-1 { background: #9c6a2e; }
+#sidebar-owner-avatar.avatar-color-2 { background: #2e7d4f; }
+#sidebar-owner-avatar.avatar-color-3 { background: #1a6dc4; }
+#sidebar-owner-avatar.avatar-color-4 { background: #5b3b96; }
+#sidebar-owner-avatar.avatar-color-5 { background: #96305f; }
 
 #sidebar-owner-name {
   flex: 1;
@@ -555,6 +612,26 @@ form button[type="submit"] {
 
 #entry-table-body tr:hover {
   background: var(--color-bg-hover);
+}
+
+#entry-table-body tr:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.table-message td {
+  cursor: default;
+  color: var(--color-fg-secondary);
+  text-align: center;
+  padding: 2rem 0.625rem;
+}
+
+.card-list .list-message {
+  background: transparent;
+  border-style: dashed;
+  color: var(--color-fg-secondary);
+  text-align: center;
+  box-shadow: none;
 }
 
 /* Popover d'édition d'un champ personnalisé */

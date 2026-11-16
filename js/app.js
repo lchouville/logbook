@@ -241,6 +241,7 @@ function buildPartageReglesTable() {
   headRow.appendChild(document.createElement('th'));
   for (const niveau of NIVEAUX_ACCES) {
     const th = document.createElement('th');
+    th.scope = 'col';
     th.textContent = niveau;
     headRow.appendChild(th);
   }
@@ -429,6 +430,10 @@ async function deletePartage(partage) {
 
 function renderPartages() {
   partageList.innerHTML = '';
+  if (partages.length === 0) {
+    renderListMessage(partageList, 'Aucun partage. Créez-en un ci-dessus.');
+    return;
+  }
   for (const partage of partages) {
     const li = document.createElement('li');
 
@@ -476,6 +481,7 @@ function renderPartages() {
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
+    deleteButton.className = 'button-danger';
     deleteButton.textContent = 'Supprimer';
     deleteButton.addEventListener('click', () => deletePartage(partage));
     actions.appendChild(deleteButton);
@@ -504,6 +510,10 @@ async function retirerPartageRecu(partageRecu) {
 
 function renderPartagesRecus() {
   partagesRecusList.innerHTML = '';
+  if (partagesRecus.length === 0) {
+    renderListMessage(partagesRecusList, 'Aucun accès reçu pour le moment.');
+    return;
+  }
   for (const partageRecu of partagesRecus) {
     const li = document.createElement('li');
 
@@ -573,6 +583,10 @@ function stopEditModele() {
 
 function renderModeles() {
   modeleList.innerHTML = '';
+  if (modeles.length === 0) {
+    renderListMessage(modeleList, 'Aucun modèle. Créez-en un ci-dessus.');
+    return;
+  }
   for (const modele of modeles) {
     const li = document.createElement('li');
 
@@ -591,6 +605,7 @@ function renderModeles() {
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
+    deleteButton.className = 'button-danger';
     deleteButton.textContent = 'Supprimer';
     deleteButton.addEventListener('click', () => deleteModele(modele));
     actions.appendChild(deleteButton);
@@ -755,6 +770,15 @@ entryTableBody.addEventListener('click', (event) => {
   if (entry) startEditEntry(entry);
 });
 
+entryTableBody.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const row = event.target.closest('tr');
+  const entry = row && entries.find((e) => e.id === row.dataset.entryId);
+  if (!entry) return;
+  event.preventDefault();
+  startEditEntry(entry);
+});
+
 entryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   entryError.textContent = '';
@@ -874,21 +898,31 @@ partageForm.addEventListener('submit', async (event) => {
   }
 });
 
-function renderLoading(list) {
+function renderListMessage(list, message) {
   list.innerHTML = '';
   const li = document.createElement('li');
-  li.textContent = 'Chargement…';
+  li.className = 'list-message';
+  li.textContent = message;
   list.appendChild(li);
 }
 
-function renderTableLoading(tbody, colspan) {
+function renderLoading(list) {
+  renderListMessage(list, 'Chargement…');
+}
+
+function renderTableMessage(tbody, colspan, message) {
   tbody.innerHTML = '';
   const row = document.createElement('tr');
+  row.className = 'table-message';
   const td = document.createElement('td');
   td.colSpan = colspan;
-  td.textContent = 'Chargement…';
+  td.textContent = message;
   row.appendChild(td);
   tbody.appendChild(row);
+}
+
+function renderTableLoading(tbody, colspan) {
+  renderTableMessage(tbody, colspan, 'Chargement…');
 }
 
 onAuthChange(async (token) => {

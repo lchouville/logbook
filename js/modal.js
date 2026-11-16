@@ -6,6 +6,13 @@ const modalClose = document.getElementById('modal-close');
 const SECTION_IDS = ['entry-form-modal', 'settings', 'partages', 'partages-recus', 'modeles'];
 const WIDE_SECTION_IDS = ['entry-form-modal'];
 const closeListeners = [];
+let returnFocusEl = null;
+
+function getFocusable() {
+  return Array.from(
+    modalPanel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+  ).filter((el) => !el.disabled && el.getClientRects().length > 0);
+}
 
 export function onModalClose(callback) {
   closeListeners.push(callback);
@@ -14,6 +21,8 @@ export function onModalClose(callback) {
 export function closeModal() {
   modalRoot.hidden = true;
   for (const callback of closeListeners) callback();
+  returnFocusEl?.focus();
+  returnFocusEl = null;
 }
 
 export function openModal(sectionId) {
@@ -21,11 +30,30 @@ export function openModal(sectionId) {
     document.getElementById(id).hidden = id !== sectionId;
   }
   modalPanel.classList.toggle('modal-panel--wide', WIDE_SECTION_IDS.includes(sectionId));
+  returnFocusEl = document.activeElement;
   modalRoot.hidden = false;
+  const focusable = getFocusable().filter((el) => el !== modalClose);
+  (focusable[0] ?? modalClose).focus();
 }
 
 modalBackdrop.addEventListener('click', closeModal);
 modalClose.addEventListener('click', closeModal);
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !modalRoot.hidden) closeModal();
+  if (modalRoot.hidden) return;
+  if (event.key === 'Escape') {
+    closeModal();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const focusable = getFocusable();
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 });
