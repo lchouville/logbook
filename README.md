@@ -30,6 +30,10 @@ Tout ajout ou correctif passe par une branche dédiée, jamais par un commit dir
 - `fix/<correctif>` — correction non urgente. Part de `develop`, PR vers `develop`.
 - `hotfix/<correctif>` — correction urgente sur une version déjà publiée. Part de `release`, PR vers `release`, puis `release` est mergée vers `gh-page` et reportée (merge ou cherry-pick) sur `develop` pour ne pas perdre le correctif.
 
+## Notes de version
+
+Un brouillon de release GitHub est tenu à jour automatiquement (`.github/workflows/release-drafter.yml`, config `.github/release-drafter.yml`) à chaque push sur `develop` ou `gh-page` : les PR fusionnées sont classées par type de commit (`feat`, `fix`, `docs`...) et la version suivante (`vX.Y.Z`) est proposée. L'utilisateur relit, corrige et publie ce brouillon pour déclencher la release. À la publication, `.github/workflows/release-notes-merge.yml` ajoute automatiquement les notes à la fin de `release-notes.md` via une PR vers `develop` (idempotent, ne touche jamais aux versions déjà présentes).
+
 ## Configuration Google OAuth
 
 Projet Google Cloud : `logbook-513714`. Client OAuth Web "Logbook Web" créé, origines autorisées `https://lchouville.github.io` et `http://localhost:8080`, scope `drive.file`. L'écran de consentement est en mode Externe/Test : seuls les comptes ajoutés dans "Utilisateurs tests" (console Google Cloud) peuvent se connecter. Le Client ID est dans `js/config.js` (voir "Configuration locale et secrets" ci-dessous) — public par nature (visible côté client), à ne pas confondre avec le code secret du client (jamais utilisé ni stocké ici, une app statique sans backend n'en a pas besoin).
