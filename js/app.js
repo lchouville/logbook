@@ -32,7 +32,7 @@ import {
 import { applyTheme, DEFAULT_THEME } from './theme.js';
 import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
 import { openModal, closeModal } from './modal.js';
-import { renderJournalPartage } from './viewer.js';
+import { renderJournalPartage, setViewerPageSize } from './viewer.js';
 import { createFieldsEditor } from './schema.js';
 
 const authSection = document.getElementById('auth');
@@ -42,6 +42,7 @@ const appShell = document.getElementById('app-shell');
 const signOutButton = document.getElementById('sign-out');
 
 const themeSelect = document.getElementById('theme-select');
+const entriesPageSizeSelect = document.getElementById('entries-page-size-select');
 const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
@@ -90,7 +91,11 @@ const modeleCancel = document.getElementById('modele-cancel');
 const modeleList = document.getElementById('modele-list');
 const modeleError = document.getElementById('modele-error');
 
+const ENTRIES_PAGE_SIZE_DEFAULT = 10;
+
 let entries = [];
+let entriesPageSize = ENTRIES_PAGE_SIZE_DEFAULT;
+let entriesVisibleCount = ENTRIES_PAGE_SIZE_DEFAULT;
 let settings = {};
 let partages = [];
 let partagesRecus = [];
@@ -125,6 +130,24 @@ themeSelect.addEventListener('change', async () => {
     settings = { ...settings, theme: previousTheme };
     themeSelect.value = previousTheme;
     applyTheme(previousTheme);
+    settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
+
+entriesPageSizeSelect.addEventListener('change', async () => {
+  settingsError.textContent = '';
+  const previousPageSize = entriesPageSize;
+  const pageSize = Number(entriesPageSizeSelect.value);
+  entriesPageSize = pageSize;
+  setViewerPageSize(pageSize);
+  settings = { ...settings, entriesPageSize: pageSize };
+  try {
+    await saveSettings(settings);
+  } catch (error) {
+    entriesPageSize = previousPageSize;
+    setViewerPageSize(previousPageSize);
+    entriesPageSizeSelect.value = String(previousPageSize);
+    settings = { ...settings, entriesPageSize: previousPageSize };
     settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
   }
 });
@@ -320,11 +343,33 @@ function appendCell(row, text) {
   return td;
 }
 
+let entriesLoadMoreObserver = null;
+
+function getEntriesLoadMoreObserver() {
+  if (!entriesLoadMoreObserver) {
+    entriesLoadMoreObserver = new IntersectionObserver((observedEntries) => {
+      if (observedEntries.some((observed) => observed.isIntersecting)) {
+        entriesVisibleCount += entriesPageSize;
+        renderEntries();
+      }
+    });
+  }
+  return entriesLoadMoreObserver;
+}
+
 function renderEntries() {
   entryTableBody.innerHTML = '';
-  for (const entry of [...entries].reverse()) {
+  if (entries.length === 0) {
+    renderTableMessage(entryTableBody, 6, 'Aucune entrée. Créez-en une avec « + Nouvelle entrée ».');
+    return;
+  }
+  const sorted = [...entries].reverse();
+  const visible = sorted.slice(0, entriesVisibleCount);
+
+  for (const entry of visible) {
     const row = document.createElement('tr');
     row.dataset.entryId = entry.id;
+    row.tabIndex = 0;
 
     appendCell(row, entry.date);
     appendCell(row, entry.titre ?? '');
@@ -334,6 +379,17 @@ function renderEntries() {
     appendCell(row, entry.texte ?? '');
 
     entryTableBody.appendChild(row);
+  }
+
+  const observer = getEntriesLoadMoreObserver();
+  observer.disconnect();
+  if (visible.length < sorted.length) {
+    const sentinelRow = document.createElement('tr');
+    const sentinelCell = document.createElement('td');
+    sentinelCell.colSpan = 6;
+    sentinelRow.appendChild(sentinelCell);
+    entryTableBody.appendChild(sentinelRow);
+    observer.observe(sentinelRow);
   }
 }
 
@@ -938,60 +994,90 @@ onAuthChange(async (token) => {
 
   if (connected) {
     currentJournalId = getJournalIdFromUrl();
+
+    // Affiche la coquille (sidebar, section active) tout de suite ; chaque
+    // donnée se charge et se rend indépendamment, sans attendre les autres.
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    renderMainView();
     renderTableLoading(entryTableBody, 6);
     renderLoading(partageList);
     renderLoading(partagesRecusList);
     renderLoading(modeleList);
 
-    try {
-      settings = await loadSettings();
-    } catch (error) {
-      settings = {};
-      settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
-    }
-    themeSelect.value = settings.theme ?? DEFAULT_THEME;
-    applyTheme(settings.theme ?? DEFAULT_THEME);
+    const loadEntriesTask = (async () => {
+      try {
+        entries = await loadEntries();
+      } catch (error) {
+        entries = [];
+        entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
+      }
+      entriesVisibleCount = entriesPageSize;
+      renderEntries();
+    })();
 
-    try {
-      entries = await loadEntries();
-    } catch (error) {
-      entries = [];
-      entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
-    }
-    renderEntries();
+    const loadSettingsTask = (async () => {
+      try {
+        settings = await loadSettings();
+      } catch (error) {
+        settings = {};
+        settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+      }
+      themeSelect.value = settings.theme ?? DEFAULT_THEME;
+      applyTheme(settings.theme ?? DEFAULT_THEME);
+      entriesPageSize = settings.entriesPageSize ?? ENTRIES_PAGE_SIZE_DEFAULT;
+      setViewerPageSize(entriesPageSize);
+      entriesPageSizeSelect.value = String(entriesPageSize);
+    })();
 
-    try {
-      partages = await loadPartages();
-    } catch (error) {
-      partages = [];
-      partageError.textContent = `Échec du chargement des partages : ${error.message}`;
-    }
-    try {
-      ownerName = await getOwnerDisplayName();
-    } catch {
-      ownerName = null;
-    }
-    renderPartages();
+    const loadPartagesTask = (async () => {
+      try {
+        partages = await loadPartages();
+      } catch (error) {
+        partages = [];
+        partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+      }
+      renderPartages();
+    })();
 
-    try {
-      partagesRecus = await loadPartagesRecus();
-    } catch (error) {
-      partagesRecus = [];
-      partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
-    }
-    renderPartagesRecus();
+    const loadOwnerNameTask = (async () => {
+      try {
+        ownerName = await getOwnerDisplayName();
+      } catch {
+        ownerName = null;
+      }
+      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    })();
 
-    try {
-      modeles = await loadModeles();
-    } catch (error) {
-      modeles = [];
-      modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
-    }
-    renderModeles();
-    renderEntryNewMenu();
+    const loadPartagesRecusTask = (async () => {
+      try {
+        partagesRecus = await loadPartagesRecus();
+      } catch (error) {
+        partagesRecus = [];
+        partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
+      }
+      renderPartagesRecus();
+      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    })();
 
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
-    renderMainView();
+    const loadModelesTask = (async () => {
+      try {
+        modeles = await loadModeles();
+      } catch (error) {
+        modeles = [];
+        modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
+      }
+      renderModeles();
+      renderEntryNewMenu();
+    })();
+
+    await Promise.all([
+      loadEntriesTask,
+      loadSettingsTask,
+      loadPartagesTask,
+      loadOwnerNameTask,
+      loadPartagesRecusTask,
+      loadModelesTask,
+    ]);
   } else {
     entries = [];
     settings = {};
@@ -1002,6 +1088,9 @@ onAuthChange(async (token) => {
     currentJournalId = null;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
+    entriesPageSize = ENTRIES_PAGE_SIZE_DEFAULT;
+    setViewerPageSize(ENTRIES_PAGE_SIZE_DEFAULT);
+    entriesPageSizeSelect.value = String(ENTRIES_PAGE_SIZE_DEFAULT);
     renderEntries();
     renderPartages();
     renderPartagesRecus();
