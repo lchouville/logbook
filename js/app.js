@@ -17,16 +17,25 @@ import {
   deleteSharedFile,
   loadPartagesRecus,
   savePartagesRecus,
+  setActiveDashboard,
+  loadDashboards,
+  saveDashboards,
+  createDashboardFolder,
 } from './drive.js';
 import {
   createEntry,
   updateEntry,
   peutRemplirRessentiAFroid,
   filtrerEntreesPartage,
+  blankContenuSchema,
+  migrateEntryContenu,
+  migrateModeleContenu,
+  previewContenuTexte,
+  resolveTitreModele,
+  buildBilanRituelDuSoir,
   NIVEAUX_ACCES,
   STATUTS,
   THEMES,
-  TYPES_JOURNEE,
   FIXED_BLOCK_KEYS,
 } from './entries.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
@@ -34,6 +43,7 @@ import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
 import { openModal, closeModal } from './modal.js';
 import { renderJournalPartage } from './viewer.js';
 import { createFieldsEditor } from './schema.js';
+import { createContentEditor } from './contenu.js';
 
 const authSection = document.getElementById('auth');
 const signInButton = document.getElementById('sign-in');
@@ -45,26 +55,34 @@ const themeSelect = document.getElementById('theme-select');
 const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
+const modelesSection = document.getElementById('modeles');
+const settingsSection = document.getElementById('settings');
+const partagesSection = document.getElementById('partages');
+const partagesRecusSection = document.getElementById('partages-recus');
+const modeleNewButton = document.getElementById('modele-new-button');
+const modeleFormTitle = document.getElementById('modele-form-title');
+const modeleFormError = document.getElementById('modele-form-error');
 const entryNewButton = document.getElementById('entry-new-button');
 const entryNewMenu = document.getElementById('entry-new-menu');
 const entryForm = document.getElementById('entry-form');
 const entryFormTitle = document.getElementById('entry-form-title');
 const entrySubmitButton = document.getElementById('entry-submit');
+const entryDeleteButton = document.getElementById('entry-delete');
 const entryTitre = document.getElementById('entry-titre');
 const entryThemes = document.getElementById('entry-themes');
 const entryNiveau = document.getElementById('entry-niveau');
 const entryStatut = document.getElementById('entry-statut');
-const entryTypeJournee = document.getElementById('entry-type-journee');
-const entryEnergie = document.getElementById('entry-energie');
-const entryRessenti = document.getElementById('entry-ressenti');
-const entryTexte = document.getElementById('entry-texte');
-const entryDateDisplay = document.getElementById('entry-date-display');
+const entryContenuList = document.getElementById('entry-contenu-list');
+const entryContenuAddTexte = document.getElementById('entry-contenu-add-texte');
+const entryContenuAddTableau = document.getElementById('entry-contenu-add-tableau');
+const entryDate = document.getElementById('entry-date');
 const entryRessentiFroidSlot = document.getElementById('entry-ressenti-froid-slot');
 const entryBlocksList = document.getElementById('entry-blocks-list');
 const entryAddFieldButton = document.getElementById('entry-add-field-button');
 const entryTableBody = document.getElementById('entry-table-body');
 const entryError = document.getElementById('entry-error');
 const partageForm = document.getElementById('partage-form');
+const partageDashboardSelect = document.getElementById('partage-dashboard');
 const partageNom = document.getElementById('partage-nom');
 const partageEmail = document.getElementById('partage-email');
 const partageReglesFieldset = document.getElementById('partage-regles');
@@ -76,19 +94,23 @@ const partagesRecusList = document.getElementById('partages-recus-list');
 const partagesRecusError = document.getElementById('partages-recus-error');
 const modeleForm = document.getElementById('modele-form');
 const modeleNom = document.getElementById('modele-nom');
+const modeleTitrePattern = document.getElementById('modele-titre-pattern');
 const modeleThemes = document.getElementById('modele-themes');
 const modeleNiveau = document.getElementById('modele-niveau');
 const modeleStatut = document.getElementById('modele-statut');
-const modeleTypeJournee = document.getElementById('modele-type-journee');
-const modeleEnergie = document.getElementById('modele-energie');
-const modeleRessenti = document.getElementById('modele-ressenti');
-const modeleTexte = document.getElementById('modele-texte');
+const modeleContenuList = document.getElementById('modele-contenu-list');
+const modeleContenuAddTexte = document.getElementById('modele-contenu-add-texte');
+const modeleContenuAddTableau = document.getElementById('modele-contenu-add-tableau');
 const modeleBlocksList = document.getElementById('modele-blocks-list');
 const modeleAddFieldButton = document.getElementById('modele-add-field-button');
 const modeleSubmit = document.getElementById('modele-submit');
 const modeleCancel = document.getElementById('modele-cancel');
 const modeleList = document.getElementById('modele-list');
+const modeleListDefaut = document.getElementById('modele-list-defaut');
 const modeleError = document.getElementById('modele-error');
+const sidebarDashboardsError = document.getElementById('sidebar-dashboards-error');
+
+const ACTIVE_DASHBOARD_KEY = 'logbook_active_dashboard_id';
 
 let entries = [];
 let settings = {};
@@ -97,9 +119,23 @@ let partagesRecus = [];
 let modeles = [];
 let editingPartageId = null;
 let editingEntryId = null;
+let editingEntryModeleId = null;
+let activeTitrePattern = null;
+let activeTitreRang = null;
+let activeCalculAuto = null;
 let editingModeleId = null;
 let ownerName = null;
 let currentJournalId = null;
+// Page affichée dans #main-content : 'entries' | 'modeles' | 'settings' | 'partages' | 'acces'.
+// currentJournalId prime dessus (journal partagé reçu affiché par-dessus, cf renderMainView).
+let mainView = 'entries';
+let dashboards = [];
+let activeDashboardId = 'default';
+// Le formulaire de partage peut cibler un dashboard différent de l'actif (sélecteur
+// dans la section Partage) : ces deux variables suivent ce choix indépendamment de
+// `partages`/`entries` (qui, eux, restent toujours ceux du dashboard actif).
+let partageViewDashboardId = null;
+let partageViewPartages = [];
 
 function buildSharedFileName(nom) {
   return `${(ownerName ?? 'Logbook').trim()} — ${nom.trim()}.json`;
@@ -141,11 +177,9 @@ function populateSelect(select, options) {
 populateSelect(entryThemes, THEMES);
 populateSelect(entryNiveau, NIVEAUX_ACCES);
 populateSelect(entryStatut, STATUTS);
-populateSelect(entryTypeJournee, TYPES_JOURNEE);
 populateSelect(modeleThemes, THEMES);
 populateSelect(modeleNiveau, NIVEAUX_ACCES);
 populateSelect(modeleStatut, STATUTS);
-populateSelect(modeleTypeJournee, TYPES_JOURNEE);
 
 function blankChampsSchema() {
   return { fields: [], order: [...FIXED_BLOCK_KEYS] };
@@ -164,6 +198,18 @@ const modeleFieldsEditor = createFieldsEditor({
   listEl: modeleBlocksList,
   addButtonEl: modeleAddFieldButton,
   idPrefix: 'modele-field',
+});
+const entryContentEditor = createContentEditor({
+  listEl: entryContenuList,
+  addTexteButtonEl: entryContenuAddTexte,
+  addTableauButtonEl: entryContenuAddTableau,
+  idPrefix: 'entry-contenu',
+});
+const modeleContentEditor = createContentEditor({
+  listEl: modeleContenuList,
+  addTexteButtonEl: modeleContenuAddTexte,
+  addTableauButtonEl: modeleContenuAddTableau,
+  idPrefix: 'modele-contenu',
 });
 
 function buildRessentiAFroidForm(entry) {
@@ -301,6 +347,7 @@ function startEditPartage(partage) {
   applyPartageRegles(partage.regles);
   partageSubmit.textContent = 'Enregistrer les modifications';
   partageCancel.hidden = false;
+  partageDashboardSelect.disabled = true;
   partageError.textContent = '';
 }
 
@@ -308,6 +355,9 @@ function stopEditPartage() {
   editingPartageId = null;
   partageForm.reset();
   resetPartageRegles();
+  // partage-dashboard fait partie du form : reset() le remettrait au premier <option>.
+  partageDashboardSelect.value = partageViewDashboardId ?? activeDashboardId;
+  partageDashboardSelect.disabled = false;
   partageSubmit.textContent = 'Créer le partage';
   partageCancel.hidden = true;
 }
@@ -330,7 +380,7 @@ function renderEntries() {
     appendCell(row, entry.themes.join(', '));
     appendCell(row, entry.niveauAcces);
     appendCell(row, entry.statut);
-    appendCell(row, entry.texte ?? '');
+    appendCell(row, previewContenuTexte(entry));
 
     entryTableBody.appendChild(row);
   }
@@ -338,12 +388,16 @@ function renderEntries() {
 
 function stopEditEntry() {
   editingEntryId = null;
+  editingEntryModeleId = null;
+  activeTitrePattern = null;
+  activeCalculAuto = null;
   entryForm.reset();
   entryRessentiFroidSlot.hidden = true;
   entryRessentiFroidSlot.innerHTML = '';
-  entryDateDisplay.textContent = new Date().toISOString().slice(0, 10);
+  entryDate.value = new Date().toISOString().slice(0, 10);
   entryFormTitle.textContent = 'Nouvelle entrée';
   entrySubmitButton.textContent = 'Enregistrer';
+  entryDeleteButton.hidden = true;
   entryError.textContent = '';
 }
 
@@ -351,32 +405,27 @@ function applyFixedFieldsToForm(fields, els) {
   for (const option of els.themes.options) option.selected = (fields.themes ?? []).includes(option.value);
   els.niveau.value = fields.niveauAcces ?? '';
   els.statut.value = fields.statut ?? '';
-  els.typeJournee.value = fields.typeJournee ?? '';
-  els.energie.value = fields.energie ?? fields.mesuresSoir?.energie ?? '';
-  els.ressenti.value = fields.ressenti ?? fields.mesuresSoir?.ressenti ?? '';
-  els.texte.value = fields.texte ?? '';
 }
 
 const entryFixedFieldEls = {
   themes: entryThemes,
   niveau: entryNiveau,
   statut: entryStatut,
-  typeJournee: entryTypeJournee,
-  energie: entryEnergie,
-  ressenti: entryRessenti,
-  texte: entryTexte,
 };
 
 function startEditEntry(entry) {
   editingEntryId = entry.id;
+  editingEntryModeleId = entry.modeleId ?? null;
   entryTitre.value = entry.titre ?? '';
   applyFixedFieldsToForm(entry, entryFixedFieldEls);
-  entryDateDisplay.textContent = entry.date;
+  entryDate.value = entry.date;
   entryRessentiFroidSlot.hidden = false;
   renderRessentiAFroidSlot(entry);
   entryFieldsEditor.render(entry.champsSchema ?? blankChampsSchema(), entry.champsPersonnalises ?? {});
+  entryContentEditor.render(entry.contenuSchema, entry.contenuValeurs ?? {}, Boolean(entry.modeleId));
   entryFormTitle.textContent = 'Modifier l’entrée';
   entrySubmitButton.textContent = 'Enregistrer les modifications';
+  entryDeleteButton.hidden = false;
   entryError.textContent = '';
   openModal('entry-form-modal');
 }
@@ -384,11 +433,36 @@ function startEditEntry(entry) {
 function openBlankEntryForm() {
   stopEditEntry();
   entryFieldsEditor.render(blankChampsSchema(), {});
+  entryContentEditor.render(blankContenuSchema(), {}, false);
   openModal('entry-form-modal');
+}
+
+function cloneContenuSchema(schema) {
+  return {
+    blocks: schema.blocks.map((block) => ({
+      ...block,
+      colonnes: block.colonnes?.map((c) => ({ ...c })),
+      lignes: block.lignes?.map((l) => ({ ...l })),
+    })),
+    order: [...schema.order],
+  };
+}
+
+function renderBilanRituelContenu(dateIso) {
+  const rituelModele = modeles.find((m) => m.nom === 'Rituel du soir');
+  const entriesRituel = rituelModele ? entries.filter((e) => e.modeleId === rituelModele.id) : [];
+  const { contenuSchema, contenuValeurs } = buildBilanRituelDuSoir(entriesRituel, dateIso);
+  entryContentEditor.render(contenuSchema, contenuValeurs, true);
 }
 
 function applyModeleToForm(modele) {
   stopEditEntry();
+  editingEntryModeleId = modele.id;
+  if (modele.titrePattern) {
+    activeTitrePattern = modele.titrePattern;
+    activeTitreRang = entries.filter((e) => e.modeleId === modele.id).length + 1;
+    entryTitre.value = resolveTitreModele(activeTitrePattern, { date: entryDate.value, id: activeTitreRang });
+  }
   applyFixedFieldsToForm(modele, entryFixedFieldEls);
   const modeleSchema = modele.champsSchema ?? { fields: [], order: [] };
   entryFieldsEditor.render(
@@ -398,6 +472,16 @@ function applyModeleToForm(modele) {
     },
     { ...(modele.champsPersonnalises ?? {}) },
   );
+  if (modele.calculAuto === 'bilan-rituel-du-soir') {
+    activeCalculAuto = modele.calculAuto;
+    renderBilanRituelContenu(entryDate.value);
+  } else {
+    entryContentEditor.render(
+      cloneContenuSchema(modele.contenuSchema),
+      { ...(modele.contenuValeursParDefaut ?? {}) },
+      true,
+    );
+  }
   openModal('entry-form-modal');
 }
 
@@ -411,17 +495,24 @@ async function syncPartages() {
   }
 }
 
+// Si le tableau affiché dans le sélecteur de partage est l'actif, répercute le
+// résultat dans `partages` (utilisé par syncPartages lors de l'édition d'entrées).
+function syncPartageViewIntoActive() {
+  if (partageViewDashboardId === activeDashboardId) partages = partageViewPartages;
+}
+
 async function deletePartage(partage) {
   partageError.textContent = '';
   if (editingPartageId === partage.id) stopEditPartage();
-  const previousPartages = partages;
-  partages = partages.filter((p) => p.id !== partage.id);
+  const previousPartages = partageViewPartages;
+  partageViewPartages = partageViewPartages.filter((p) => p.id !== partage.id);
   renderPartages();
   try {
     await deleteSharedFile(partage.fichierId);
-    await savePartages(partages);
+    await savePartages(partageViewPartages, partageViewDashboardId);
+    syncPartageViewIntoActive();
   } catch (error) {
-    partages = previousPartages;
+    partageViewPartages = previousPartages;
     partageError.textContent = `Échec de la suppression : ${error.message}`;
     renderPartages();
   }
@@ -429,7 +520,7 @@ async function deletePartage(partage) {
 
 function renderPartages() {
   partageList.innerHTML = '';
-  for (const partage of partages) {
+  for (const partage of partageViewPartages) {
     const li = document.createElement('li');
 
     const titre = document.createElement('p');
@@ -486,19 +577,66 @@ function renderPartages() {
   }
 }
 
+function populatePartageDashboardSelect() {
+  partageDashboardSelect.innerHTML = '';
+  for (const dashboard of dashboards) {
+    const option = document.createElement('option');
+    option.value = dashboard.id;
+    option.textContent = dashboard.nom;
+    partageDashboardSelect.appendChild(option);
+  }
+  partageDashboardSelect.value = partageViewDashboardId ?? activeDashboardId;
+}
+
+// Charge les partages du tableau de bord sélectionné dans le formulaire (par défaut
+// le dernier actif), indépendamment de `partages` qui reste toujours celui de l'actif.
+let partageViewRequestId = 0;
+
+async function loadPartageView(dashboardId) {
+  stopEditPartage();
+  partageViewDashboardId = dashboardId;
+  partageDashboardSelect.value = dashboardId;
+  partageError.textContent = '';
+  renderLoading(partageList);
+  // Un changement rapide du sélecteur peut faire se chevaucher deux appels : si une
+  // requête plus ancienne et plus lente répond après une plus récente, elle écraserait
+  // la liste déjà affichée pour le nouveau tableau sélectionné. On ignore les réponses
+  // qui ne correspondent plus à la dernière sélection demandée.
+  const requestId = ++partageViewRequestId;
+  let result;
+  let error;
+  try {
+    result = dashboardId === activeDashboardId ? partages : await loadPartages(dashboardId);
+  } catch (err) {
+    error = err;
+  }
+  if (requestId !== partageViewRequestId) return;
+  if (error) {
+    partageViewPartages = [];
+    partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+  } else {
+    partageViewPartages = result;
+  }
+  renderPartages();
+}
+
+partageDashboardSelect.addEventListener('change', () => {
+  loadPartageView(partageDashboardSelect.value);
+});
+
 async function retirerPartageRecu(partageRecu) {
   partagesRecusError.textContent = '';
   const previous = partagesRecus;
   partagesRecus = partagesRecus.filter((p) => p.id !== partageRecu.id);
   renderPartagesRecus();
-  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
   try {
     await savePartagesRecus(partagesRecus);
   } catch (error) {
     partagesRecus = previous;
     partagesRecusError.textContent = `Échec du retrait : ${error.message}`;
     renderPartagesRecus();
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
   }
 }
 
@@ -536,10 +674,6 @@ function readModeleFixedFields() {
     themes: Array.from(modeleThemes.selectedOptions).map((option) => option.value),
     niveauAcces: modeleNiveau.value,
     statut: modeleStatut.value,
-    typeJournee: modeleTypeJournee.value,
-    energie: modeleEnergie.valueAsNumber,
-    ressenti: modeleRessenti.valueAsNumber,
-    texte: modeleTexte.value,
   };
 }
 
@@ -547,29 +681,54 @@ const modeleFixedFieldEls = {
   themes: modeleThemes,
   niveau: modeleNiveau,
   statut: modeleStatut,
-  typeJournee: modeleTypeJournee,
-  energie: modeleEnergie,
-  ressenti: modeleRessenti,
-  texte: modeleTexte,
 };
 
 function startEditModele(modele) {
   editingModeleId = modele.id;
   modeleNom.value = modele.nom;
+  modeleTitrePattern.value = modele.titrePattern ?? '';
   applyFixedFieldsToForm(modele, modeleFixedFieldEls);
   modeleFieldsEditor.render(modele.champsSchema ?? { fields: [], order: [] }, modele.champsPersonnalises ?? {});
+  modeleContentEditor.render(modele.contenuSchema, modele.contenuValeursParDefaut ?? {}, false);
+  modeleFormTitle.textContent = 'Modifier le modèle';
   modeleSubmit.textContent = 'Enregistrer les modifications';
   modeleCancel.hidden = false;
-  modeleError.textContent = '';
+  modeleFormError.textContent = '';
+  openModal('modele-form-modal');
 }
 
 function stopEditModele() {
   editingModeleId = null;
   modeleForm.reset();
   modeleFieldsEditor.render({ fields: [], order: [] }, {});
+  modeleContentEditor.render(blankContenuSchema(), {}, false);
+  modeleFormTitle.textContent = 'Nouveau modèle';
   modeleSubmit.textContent = 'Créer le modèle';
   modeleCancel.hidden = true;
+  modeleFormError.textContent = '';
 }
+
+function renderModelesDefaut(modelesDefaut) {
+  modeleListDefaut.innerHTML = '';
+  for (const modele of modelesDefaut) {
+    const li = document.createElement('li');
+    const nom = document.createElement('p');
+    nom.textContent = modele.nom;
+    li.appendChild(nom);
+    modeleListDefaut.appendChild(li);
+  }
+}
+
+async function loadModelesDefaut() {
+  const index = await (await fetch('models/index.json')).json();
+  return Promise.all(index.map(async (fichier) => (await fetch(`models/${fichier}`)).json()));
+}
+
+loadModelesDefaut()
+  .then(renderModelesDefaut)
+  .catch((error) => {
+    modeleError.textContent = `Échec du chargement des modèles par défaut : ${error.message}`;
+  });
 
 function renderModeles() {
   modeleList.innerHTML = '';
@@ -617,54 +776,149 @@ async function deleteModele(modele) {
   }
 }
 
-modeleCancel.addEventListener('click', stopEditModele);
+function diffChampsSchema(oldSchema, newSchema) {
+  const oldIds = new Set(oldSchema.fields.map((f) => f.id));
+  const newIds = new Set(newSchema.fields.map((f) => f.id));
+  return {
+    added: newSchema.fields.filter((f) => !oldIds.has(f.id)),
+    removed: oldSchema.fields.filter((f) => !newIds.has(f.id)),
+  };
+}
+
+// Les entrées copient le champsSchema du modèle au moment de leur création
+// (pas de référence vivante) : on répercute ici les propriétés ajoutées
+// (valeur vide) ou retirées (selon le choix de l'utilisateur) sur les
+// entrées déjà créées via ce modèle.
+function syncEntriesChampsSchema(modeleId, added, removed, deleteRemovedValues) {
+  const removedIds = new Set(removed.map((f) => f.id));
+  return entries.map((entry) => {
+    if (entry.modeleId !== modeleId) return entry;
+    let fields = entry.champsSchema?.fields ?? [];
+    let order = entry.champsSchema?.order ?? [];
+    const champsPersonnalises = { ...entry.champsPersonnalises };
+
+    for (const field of added) {
+      if (fields.some((f) => f.id === field.id)) continue;
+      fields = [...fields, { ...field }];
+      order = [...order, field.id];
+    }
+
+    if (deleteRemovedValues) {
+      fields = fields.filter((f) => !removedIds.has(f.id));
+      order = order.filter((id) => !removedIds.has(id));
+      for (const field of removed) delete champsPersonnalises[field.id];
+    }
+
+    return { ...entry, champsSchema: { fields, order }, champsPersonnalises };
+  });
+}
+
+modeleCancel.addEventListener('click', () => {
+  stopEditModele();
+  closeModal();
+});
 
 modeleForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  modeleError.textContent = '';
+  modeleFormError.textContent = '';
   const nom = modeleNom.value.trim();
+  const titrePattern = modeleTitrePattern.value.trim();
   const fixed = readModeleFixedFields();
   const champsPersonnalises = modeleFieldsEditor.getValues();
   const champsSchema = modeleFieldsEditor.getSchema();
+  const contenuSchema = modeleContentEditor.getSchema();
+  const contenuValeursParDefaut = modeleContentEditor.getValues();
   const previousModeles = modeles;
+  const previousEntries = entries;
+  let entriesChanged = false;
 
   if (editingModeleId) {
-    modeles = modeles.map((m) => (m.id === editingModeleId ? { ...m, nom, ...fixed, champsPersonnalises, champsSchema } : m));
+    const previousModele = modeles.find((m) => m.id === editingModeleId);
+    const { added, removed } = diffChampsSchema(previousModele?.champsSchema ?? { fields: [], order: [] }, champsSchema);
+    let deleteRemovedValues = false;
+    if (removed.length > 0 && entries.some((e) => e.modeleId === editingModeleId)) {
+      deleteRemovedValues = window.confirm(
+        `Ce modèle retire la propriété « ${removed.map((f) => f.nom).join(' », « ')} ».\n\n` +
+          `La supprimer aussi des entrées déjà créées via ce modèle ?\n` +
+          `OK = la supprimer aussi des entrées\nAnnuler = conserver les valeurs déjà saisies`,
+      );
+    }
+    if (added.length > 0 || removed.length > 0) {
+      entries = syncEntriesChampsSchema(editingModeleId, added, removed, deleteRemovedValues);
+      entriesChanged = true;
+    }
+    modeles = modeles.map((m) =>
+      m.id === editingModeleId
+        ? { ...m, nom, titrePattern, ...fixed, champsPersonnalises, champsSchema, contenuSchema, contenuValeursParDefaut }
+        : m,
+    );
   } else {
     modeles = [
       ...modeles,
-      { id: crypto.randomUUID(), nom, ...fixed, champsPersonnalises, champsSchema, creeLe: new Date().toISOString() },
+      {
+        id: crypto.randomUUID(),
+        nom,
+        titrePattern,
+        ...fixed,
+        champsPersonnalises,
+        champsSchema,
+        contenuSchema,
+        contenuValeursParDefaut,
+        creeLe: new Date().toISOString(),
+      },
     ];
   }
   renderModeles();
   renderEntryNewMenu();
+  if (entriesChanged) renderEntries();
   try {
     await saveModeles(modeles);
+    if (entriesChanged) await saveEntries(entries);
     stopEditModele();
+    closeModal();
   } catch (error) {
     modeles = previousModeles;
+    entries = previousEntries;
     renderModeles();
     renderEntryNewMenu();
-    modeleError.textContent = `Échec de l'enregistrement du modèle : ${error.message}`;
+    if (entriesChanged) renderEntries();
+    modeleFormError.textContent = `Échec de l'enregistrement du modèle : ${error.message}`;
   }
 });
 
 function renderMainView() {
-  if (currentJournalId) {
-    entriesSection.hidden = true;
+  entriesSection.hidden = true;
+  journalPartageSection.hidden = true;
+  modelesSection.hidden = true;
+  settingsSection.hidden = true;
+  partagesSection.hidden = true;
+  partagesRecusSection.hidden = true;
+
+  // Les pages explicites (sidebar) priment sur le journal partagé affiché : sinon,
+  // cliquer Paramètres/Partage/Modèles/Accès depuis la vue d'un journal reçu ne fait
+  // rien, puisque ce bloc resterait sur journalPartageSection.
+  if (mainView === 'modeles') {
+    modelesSection.hidden = false;
+  } else if (mainView === 'settings') {
+    settingsSection.hidden = false;
+  } else if (mainView === 'partages') {
+    partagesSection.hidden = false;
+  } else if (mainView === 'acces') {
+    partagesRecusSection.hidden = false;
+  } else if (currentJournalId) {
     journalPartageSection.hidden = false;
     renderJournalPartage(currentJournalId, (updated) => {
       partagesRecus = updated;
       renderPartagesRecus();
-      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
     });
   } else {
     entriesSection.hidden = false;
-    journalPartageSection.hidden = true;
   }
 }
 
 function setJournalId(fichierId) {
+  mainView = 'entries';
   currentJournalId = fichierId;
   const url = new URL(window.location.href);
   if (fichierId) {
@@ -674,7 +928,7 @@ function setJournalId(fichierId) {
   }
   window.history.pushState({ journal: fichierId }, '', url);
   renderMainView();
-  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
   closeModal();
   closeSidebarOnMobile();
 }
@@ -682,15 +936,41 @@ function setJournalId(fichierId) {
 window.addEventListener('popstate', () => {
   currentJournalId = getJournalIdFromUrl();
   renderMainView();
-  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
 });
 
 initSidebar({
   onSelectJournal: setJournalId,
-  onOpenSettings: () => openModal('settings'),
-  onOpenPartages: () => openModal('partages'),
-  onOpenAcces: () => openModal('partages-recus'),
-  onOpenModeles: () => openModal('modeles'),
+  onOpenSettings: () => {
+    mainView = 'settings';
+    renderMainView();
+    closeSidebarOnMobile();
+  },
+  onOpenPartages: () => {
+    mainView = 'partages';
+    renderMainView();
+    populatePartageDashboardSelect();
+    loadPartageView(activeDashboardId);
+    closeSidebarOnMobile();
+  },
+  onOpenAcces: () => {
+    mainView = 'acces';
+    renderMainView();
+    closeSidebarOnMobile();
+  },
+  onOpenModeles: () => {
+    mainView = 'modeles';
+    renderMainView();
+    closeSidebarOnMobile();
+  },
+  onSelectDashboard: switchDashboard,
+  onCreateDashboard: createDashboard,
+  onRenameDashboard: renameDashboard,
+});
+
+modeleNewButton.addEventListener('click', () => {
+  stopEditModele();
+  openModal('modele-form-modal');
 });
 
 signInButton.addEventListener('click', signIn);
@@ -749,6 +1029,16 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !entryNewMenu.hidden) closeEntryNewMenu();
 });
 
+entryDate.addEventListener('change', () => {
+  if (editingEntryId) return;
+  if (activeTitrePattern) {
+    entryTitre.value = resolveTitreModele(activeTitrePattern, { date: entryDate.value, id: activeTitreRang });
+  }
+  if (activeCalculAuto === 'bilan-rituel-du-soir') {
+    renderBilanRituelContenu(entryDate.value);
+  }
+});
+
 entryTableBody.addEventListener('click', (event) => {
   const row = event.target.closest('tr');
   const entry = row && entries.find((e) => e.id === row.dataset.entryId);
@@ -761,36 +1051,36 @@ entryForm.addEventListener('submit', async (event) => {
   const themes = Array.from(entryThemes.selectedOptions).map((option) => option.value);
   const champsPersonnalises = entryFieldsEditor.getValues();
   const champsSchema = entryFieldsEditor.getSchema();
+  const contenuSchema = entryContentEditor.getSchema();
+  const contenuValeurs = entryContentEditor.getValues();
   const previousEntries = entries;
 
   if (editingEntryId) {
     const original = entries.find((e) => e.id === editingEntryId);
     const updated = updateEntry(original, {
       titre: entryTitre.value.trim(),
+      date: entryDate.value,
       themes,
       niveauAcces: entryNiveau.value,
       statut: entryStatut.value,
-      typeJournee: entryTypeJournee.value,
-      energie: entryEnergie.valueAsNumber,
-      ressenti: entryRessenti.valueAsNumber,
-      texte: entryTexte.value,
       champsPersonnalises,
       champsSchema,
+      contenuSchema,
+      contenuValeurs,
     });
     entries = entries.map((e) => (e.id === editingEntryId ? updated : e));
   } else {
     const entry = createEntry({
       titre: entryTitre.value.trim(),
-      date: new Date().toISOString().slice(0, 10),
+      date: entryDate.value,
       themes,
       niveauAcces: entryNiveau.value,
       statut: entryStatut.value,
-      typeJournee: entryTypeJournee.value,
-      energie: entryEnergie.valueAsNumber,
-      ressenti: entryRessenti.valueAsNumber,
-      texte: entryTexte.value,
       champsPersonnalises,
       champsSchema,
+      modeleId: editingEntryModeleId,
+      contenuSchema,
+      contenuValeurs,
     });
     entries = [...entries, entry];
   }
@@ -804,6 +1094,24 @@ entryForm.addEventListener('submit', async (event) => {
   } catch (error) {
     entries = previousEntries;
     entryError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
+
+entryDeleteButton.addEventListener('click', async () => {
+  if (!editingEntryId) return;
+  if (!window.confirm('Supprimer définitivement cette entrée ?')) return;
+  entryError.textContent = '';
+  const previousEntries = entries;
+  entries = entries.filter((e) => e.id !== editingEntryId);
+  try {
+    await saveEntries(entries);
+    await syncPartages();
+    renderEntries();
+    stopEditEntry();
+    closeModal();
+  } catch (error) {
+    entries = previousEntries;
+    entryError.textContent = `Échec de la suppression : ${error.message}`;
   }
 });
 
@@ -821,9 +1129,10 @@ partageForm.addEventListener('submit', async (event) => {
   const email = partageEmail.value.trim();
 
   if (editingPartageId) {
-    const partage = partages.find((p) => p.id === editingPartageId);
+    const partage = partageViewPartages.find((p) => p.id === editingPartageId);
     try {
-      const filtered = filtrerEntreesPartage(entries, regles);
+      const sourceEntries = await loadEntries(partageViewDashboardId);
+      const filtered = filtrerEntreesPartage(sourceEntries, regles);
       await updateSharedFile(partage.fichierId, filtered);
       let fileName = partage.fileName;
       if (nom !== partage.nom) {
@@ -835,10 +1144,11 @@ partageForm.addEventListener('submit', async (event) => {
         if (permissionId) await revokePermission(partage.fichierId, permissionId);
         permissionId = await shareFileWithEmail(partage.fichierId, email);
       }
-      partages = partages.map((p) =>
+      partageViewPartages = partageViewPartages.map((p) =>
         p.id === editingPartageId ? { ...p, nom, regles, emails: [email], fileName, permissionId } : p,
       );
-      await savePartages(partages);
+      await savePartages(partageViewPartages, partageViewDashboardId);
+      syncPartageViewIntoActive();
       renderPartages();
       stopEditPartage();
     } catch (error) {
@@ -849,11 +1159,12 @@ partageForm.addEventListener('submit', async (event) => {
 
   try {
     const fileName = buildSharedFileName(nom);
-    const filtered = filtrerEntreesPartage(entries, regles);
-    const fichierId = await createSharedFile(fileName, filtered);
+    const sourceEntries = await loadEntries(partageViewDashboardId);
+    const filtered = filtrerEntreesPartage(sourceEntries, regles);
+    const fichierId = await createSharedFile(fileName, filtered, partageViewDashboardId);
     const permissionId = await shareFileWithEmail(fichierId, email);
-    partages = [
-      ...partages,
+    partageViewPartages = [
+      ...partageViewPartages,
       {
         id: crypto.randomUUID(),
         nom,
@@ -865,10 +1176,13 @@ partageForm.addEventListener('submit', async (event) => {
         creeLe: new Date().toISOString(),
       },
     ];
-    await savePartages(partages);
+    await savePartages(partageViewPartages, partageViewDashboardId);
+    syncPartageViewIntoActive();
     renderPartages();
     partageForm.reset();
     resetPartageRegles();
+    // partage-dashboard fait partie du form : reset() le remettrait au premier <option>.
+    partageDashboardSelect.value = partageViewDashboardId;
   } catch (error) {
     partageError.textContent = `Échec de la création du partage : ${error.message}`;
   }
@@ -891,6 +1205,155 @@ function renderTableLoading(tbody, colspan) {
   tbody.appendChild(row);
 }
 
+// Charge entries/settings/partages/partagesRecus/modeles pour le dashboard actif
+// (déjà sélectionné via setActiveDashboard) et réaffiche les vues correspondantes.
+// Partagée entre la connexion initiale et la bascule de dashboard.
+async function loadAccountData() {
+  entryError.textContent = '';
+  settingsError.textContent = '';
+  partageError.textContent = '';
+  partagesRecusError.textContent = '';
+  modeleError.textContent = '';
+  renderTableLoading(entryTableBody, 6);
+  renderLoading(partageList);
+  renderLoading(partagesRecusList);
+  renderLoading(modeleList);
+
+  try {
+    settings = await loadSettings();
+  } catch (error) {
+    settings = {};
+    settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+  }
+  themeSelect.value = settings.theme ?? DEFAULT_THEME;
+  applyTheme(settings.theme ?? DEFAULT_THEME);
+
+  try {
+    entries = (await loadEntries()).map(migrateEntryContenu);
+  } catch (error) {
+    entries = [];
+    entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
+  }
+  renderEntries();
+
+  try {
+    partages = await loadPartages();
+  } catch (error) {
+    partages = [];
+    partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+  }
+  partageViewDashboardId = activeDashboardId;
+  partageViewPartages = partages;
+  try {
+    ownerName = await getOwnerDisplayName();
+  } catch {
+    ownerName = null;
+  }
+  renderPartages();
+
+  try {
+    partagesRecus = await loadPartagesRecus();
+  } catch (error) {
+    partagesRecus = [];
+    partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
+  }
+  renderPartagesRecus();
+
+  try {
+    modeles = (await loadModeles()).map(migrateModeleContenu);
+  } catch (error) {
+    modeles = [];
+    modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
+  }
+  renderModeles();
+  renderEntryNewMenu();
+}
+
+let dashboardSwitchInProgress = false;
+
+async function switchDashboard(dashboardId) {
+  // Ignore tout clic pendant qu'un chargement de dashboard est en cours : sinon deux
+  // appels se chevauchent et se marchent dessus sur activeDashboardId/folderIdCache
+  // (partagés côté drive.js), et on finit par charger les données du mauvais dossier.
+  if (dashboardId === activeDashboardId) {
+    // "Mes entrées" a été retiré de la sidebar : cliquer sur le dashboard déjà actif
+    // est maintenant le seul moyen de revenir à ses entrées depuis une autre page
+    // (Partage/Modèles/Paramètres/Accès) ou depuis un journal partagé reçu.
+    if (currentJournalId !== null || mainView !== 'entries') setJournalId(null);
+    return;
+  }
+  if (dashboardSwitchInProgress) return;
+  dashboardSwitchInProgress = true;
+  try {
+    await switchDashboardUnguarded(dashboardId);
+  } finally {
+    dashboardSwitchInProgress = false;
+  }
+}
+
+async function switchDashboardUnguarded(dashboardId) {
+  sidebarDashboardsError.textContent = '';
+  stopEditEntry();
+  stopEditModele();
+  stopEditPartage();
+  closeModal();
+  // Un dashboard n'affiche que ses entrées : on quitte toute autre page/journal en cours.
+  mainView = 'entries';
+  if (currentJournalId !== null) {
+    currentJournalId = null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('journal');
+    window.history.pushState({ journal: null }, '', url);
+  }
+  activeDashboardId = dashboardId;
+  localStorage.setItem(ACTIVE_DASHBOARD_KEY, dashboardId);
+  setActiveDashboard(dashboardId);
+  // Surligner le dashboard sélectionné tout de suite plutôt qu'après le chargement
+  // réseau : sinon la sidebar semble figée pendant les quelques appels Drive séquentiels.
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  await loadAccountData();
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  renderMainView();
+  closeSidebarOnMobile();
+}
+
+async function createDashboard() {
+  if (dashboardSwitchInProgress) return;
+  const nom = window.prompt('Nom du nouveau tableau de bord :');
+  if (!nom || !nom.trim()) return;
+  sidebarDashboardsError.textContent = '';
+  const id = crypto.randomUUID();
+  const dossierNom = `logbook-${id}`;
+  const previousDashboards = dashboards;
+  try {
+    const dossierId = await createDashboardFolder(dossierNom);
+    dashboards = [...dashboards, { id, nom: nom.trim(), dossierNom, dossierId, creeLe: new Date().toISOString() }];
+    await saveDashboards(dashboards);
+    await switchDashboard(id);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de la création du tableau de bord : ${error.message}`;
+  }
+}
+
+async function renameDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  const nom = window.prompt('Nouveau nom du tableau de bord :', dashboard.nom);
+  if (!nom || !nom.trim() || nom.trim() === dashboard.nom) return;
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  dashboards = dashboards.map((d) => (d.id === dashboardId ? { ...d, nom: nom.trim() } : d));
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  try {
+    await saveDashboards(dashboards);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec du renommage : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   authSection.hidden = connected;
@@ -901,62 +1364,38 @@ onAuthChange(async (token) => {
   partageError.textContent = '';
   partagesRecusError.textContent = '';
   modeleError.textContent = '';
+  sidebarDashboardsError.textContent = '';
 
   if (connected) {
     currentJournalId = getJournalIdFromUrl();
+    mainView = 'entries';
+
+    // Feedback immédiat : sans ça, sidebar et contenu restent figés/vides pendant les
+    // premiers appels Drive (chargement du registre de dashboards), avant même que
+    // loadAccountData démarre — ça donnait une impression de chargement incohérent.
+    renderMainView();
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
     renderTableLoading(entryTableBody, 6);
     renderLoading(partageList);
     renderLoading(partagesRecusList);
     renderLoading(modeleList);
 
     try {
-      settings = await loadSettings();
+      dashboards = await loadDashboards();
     } catch (error) {
-      settings = {};
-      settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+      dashboards = [{ id: 'default', nom: 'Mon journal de bord', dossierNom: 'logbook', creeLe: new Date().toISOString() }];
+      sidebarDashboardsError.textContent = `Échec du chargement des tableaux de bord : ${error.message}`;
     }
-    themeSelect.value = settings.theme ?? DEFAULT_THEME;
-    applyTheme(settings.theme ?? DEFAULT_THEME);
+    const storedDashboardId = localStorage.getItem(ACTIVE_DASHBOARD_KEY);
+    activeDashboardId = dashboards.some((d) => d.id === storedDashboardId) ? storedDashboardId : 'default';
+    setActiveDashboard(activeDashboardId);
+    // Dashboards connus tout de suite : la liste/bouton "créer" s'affichent sans attendre
+    // le reste (entrées/partages/modèles), qui arrive progressivement via loadAccountData.
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
 
-    try {
-      entries = await loadEntries();
-    } catch (error) {
-      entries = [];
-      entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
-    }
-    renderEntries();
+    await loadAccountData();
 
-    try {
-      partages = await loadPartages();
-    } catch (error) {
-      partages = [];
-      partageError.textContent = `Échec du chargement des partages : ${error.message}`;
-    }
-    try {
-      ownerName = await getOwnerDisplayName();
-    } catch {
-      ownerName = null;
-    }
-    renderPartages();
-
-    try {
-      partagesRecus = await loadPartagesRecus();
-    } catch (error) {
-      partagesRecus = [];
-      partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
-    }
-    renderPartagesRecus();
-
-    try {
-      modeles = await loadModeles();
-    } catch (error) {
-      modeles = [];
-      modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
-    }
-    renderModeles();
-    renderEntryNewMenu();
-
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
     renderMainView();
   } else {
     entries = [];
@@ -964,8 +1403,11 @@ onAuthChange(async (token) => {
     partages = [];
     partagesRecus = [];
     modeles = [];
+    dashboards = [];
+    activeDashboardId = 'default';
     ownerName = null;
     currentJournalId = null;
+    mainView = 'entries';
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
     renderEntries();

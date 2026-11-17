@@ -14,6 +14,14 @@
   --radius: 6px;
   --radius-sm: 4px;
   --shadow-card: 0 1px 2px rgba(15, 15, 15, 0.1);
+
+  /* Palette catégorielle validée (skill dataviz) — ordre fixe, jamais cyclé */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --color-chart-axe: #c3c2b7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,6 +36,12 @@
     --color-accent-fg: #191919;
     --color-danger: #ff6b6b;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --color-chart-axe: #383835;
   }
 }
 
@@ -42,6 +56,12 @@
   --color-accent-fg: #191919;
   --color-danger: #ff6b6b;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --color-chart-axe: #383835;
 }
 
 * {
@@ -395,6 +415,7 @@ form button[type="submit"] {
   background: var(--color-bg-hover);
 }
 
+#sidebar-dashboards,
 #sidebar-journaux {
   list-style: none;
   padding: 0;
@@ -404,6 +425,12 @@ form button[type="submit"] {
   gap: 0.25rem;
 }
 
+#sidebar-dashboards-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+}
+
+#sidebar-dashboards button,
 #sidebar-journaux button,
 #sidebar-journaux-plus,
 #sidebar-partage-button,
@@ -415,6 +442,7 @@ form button[type="submit"] {
   border-color: transparent;
 }
 
+#sidebar-dashboards button:hover,
 #sidebar-journaux button:hover,
 #sidebar-journaux-plus:hover,
 #sidebar-partage-button:hover,
@@ -422,6 +450,7 @@ form button[type="submit"] {
   background: var(--color-bg-hover);
 }
 
+#sidebar-dashboards button[aria-current="true"],
 #sidebar-journaux button[aria-current="true"] {
   background: var(--color-accent);
   border-color: var(--color-accent);
@@ -466,7 +495,8 @@ form button[type="submit"] {
 
 /* Tableau d'entrées */
 
-#entries-header {
+#entries-header,
+#modeles-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -474,18 +504,21 @@ form button[type="submit"] {
   margin-bottom: 1rem;
 }
 
-#entries-header h2 {
+#entries-header h2,
+#modeles-header h2 {
   margin: 0;
 }
 
-#entry-new-button {
+#entry-new-button,
+#modele-new-button {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-fg);
   white-space: nowrap;
 }
 
-#entry-new-button:hover {
+#entry-new-button:hover,
+#modele-new-button:hover {
   opacity: 0.9;
 }
 
@@ -611,6 +644,12 @@ form button[type="submit"] {
   margin-bottom: 1rem;
 }
 
+.field-hint {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-fg-secondary);
+}
+
 .entry-property-row {
   display: flex;
   align-items: center;
@@ -698,6 +737,143 @@ form button[type="submit"] {
 
 .fields-editor-add-button {
   width: 100%;
+  border-style: dashed;
+  color: var(--color-fg-secondary);
+  background: transparent;
+}
+
+/* Contenu (blocs texte/tableau d'une entrée ou d'un modèle) */
+
+.contenu-section {
+  margin-bottom: 1rem;
+}
+
+.contenu-section-titre {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.contenu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.contenu-block {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.625rem 0.75rem;
+}
+
+.contenu-block-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.contenu-block-titre {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.contenu-block-titre-input {
+  flex: 1;
+  width: auto;
+  font-weight: 600;
+  margin: 0;
+}
+
+.contenu-block textarea {
+  width: 100%;
+}
+
+.contenu-tableau {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.contenu-tableau th,
+.contenu-tableau td {
+  padding: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.contenu-tableau th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.contenu-tableau input {
+  margin: 0;
+}
+
+.contenu-cell-delete {
+  margin-left: 0.25rem;
+  padding: 0 0.3rem;
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-fg-secondary);
+}
+
+.contenu-add-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.contenu-graphique-vide {
+  color: var(--color-fg-secondary);
+  font-size: 0.875rem;
+}
+
+.contenu-graphique-svg {
+  width: 100%;
+  height: auto;
+}
+
+.contenu-graphique-axe {
+  stroke: var(--color-chart-axe);
+  stroke-width: 1;
+}
+
+.contenu-graphique-label {
+  fill: var(--color-fg-secondary);
+  font-size: 10px;
+}
+
+.contenu-graphique-ligne {
+  fill: none;
+  stroke-width: 2;
+}
+
+.contenu-graphique-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: var(--color-fg-secondary);
+}
+
+.contenu-graphique-legende li {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.contenu-graphique-puce {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.contenu-add-buttons button {
   border-style: dashed;
   color: var(--color-fg-secondary);
   background: transparent;
