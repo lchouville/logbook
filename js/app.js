@@ -590,17 +590,32 @@ function populatePartageDashboardSelect() {
 
 // Charge les partages du tableau de bord sélectionné dans le formulaire (par défaut
 // le dernier actif), indépendamment de `partages` qui reste toujours celui de l'actif.
+let partageViewRequestId = 0;
+
 async function loadPartageView(dashboardId) {
   stopEditPartage();
   partageViewDashboardId = dashboardId;
   partageDashboardSelect.value = dashboardId;
   partageError.textContent = '';
   renderLoading(partageList);
+  // Un changement rapide du sélecteur peut faire se chevaucher deux appels : si une
+  // requête plus ancienne et plus lente répond après une plus récente, elle écraserait
+  // la liste déjà affichée pour le nouveau tableau sélectionné. On ignore les réponses
+  // qui ne correspondent plus à la dernière sélection demandée.
+  const requestId = ++partageViewRequestId;
+  let result;
+  let error;
   try {
-    partageViewPartages = dashboardId === activeDashboardId ? partages : await loadPartages(dashboardId);
-  } catch (error) {
+    result = dashboardId === activeDashboardId ? partages : await loadPartages(dashboardId);
+  } catch (err) {
+    error = err;
+  }
+  if (requestId !== partageViewRequestId) return;
+  if (error) {
     partageViewPartages = [];
     partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+  } else {
+    partageViewPartages = result;
   }
   renderPartages();
 }
@@ -879,14 +894,10 @@ function renderMainView() {
   partagesSection.hidden = true;
   partagesRecusSection.hidden = true;
 
-  if (currentJournalId) {
-    journalPartageSection.hidden = false;
-    renderJournalPartage(currentJournalId, (updated) => {
-      partagesRecus = updated;
-      renderPartagesRecus();
-      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-    });
-  } else if (mainView === 'modeles') {
+  // Les pages explicites (sidebar) priment sur le journal partagé affiché : sinon,
+  // cliquer Paramètres/Partage/Modèles/Accès depuis la vue d'un journal reçu ne fait
+  // rien, puisque ce bloc resterait sur journalPartageSection.
+  if (mainView === 'modeles') {
     modelesSection.hidden = false;
   } else if (mainView === 'settings') {
     settingsSection.hidden = false;
@@ -894,6 +905,13 @@ function renderMainView() {
     partagesSection.hidden = false;
   } else if (mainView === 'acces') {
     partagesRecusSection.hidden = false;
+  } else if (currentJournalId) {
+    journalPartageSection.hidden = false;
+    renderJournalPartage(currentJournalId, (updated) => {
+      partagesRecus = updated;
+      renderPartagesRecus();
+      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+    });
   } else {
     entriesSection.hidden = false;
   }

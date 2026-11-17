@@ -182,7 +182,10 @@ async function migrateLegacyFile(folderId) {
   return legacyFile.id;
 }
 
-async function findFileId(fileName, folderId) {
+// dashboardId : le dashboard dont dépend folderId (pas forcément l'actif — un appelant
+// peut résoudre le dossier d'un autre dashboard, ex. le sélecteur de tableau du partage).
+// Sert uniquement à borner la migration legacy ci-dessous au bon dashboard.
+async function findFileId(fileName, folderId, dashboardId = activeDashboardId) {
   // Clé incluant le dossier : un même nom de fichier (logbook-data.json, etc.) existe
   // dans le dossier de chaque dashboard, un cache par nom seul renverrait l'id du
   // mauvais dossier dès qu'on lit deux dashboards différents dans la même session.
@@ -199,7 +202,7 @@ async function findFileId(fileName, folderId) {
   // La migration ne doit jouer que pour le dashboard "default" : sa recherche n'est pas
   // bornée à un dossier (legacy, fichier posé n'importe où dans le Drive), donc avec
   // plusieurs dashboards elle irait voler le logbook-data.json d'un autre dashboard.
-  const canMigrate = fileName === DATA_FILE_NAME && activeDashboardId === 'default';
+  const canMigrate = fileName === DATA_FILE_NAME && dashboardId === 'default';
   const fileId = data.files?.[0]?.id ?? (canMigrate ? await migrateLegacyFile(folderId) : null);
   fileIdCache.set(cacheKey, fileId);
   return fileId;
@@ -230,16 +233,16 @@ async function updateFile(fileId, content) {
   if (!response.ok) throw new Error(`Mise à jour du fichier Drive : ${await describeError(response)}`);
 }
 
-async function loadJsonFile(fileName, fallback, folderId) {
-  const fileId = await findFileId(fileName, folderId);
+async function loadJsonFile(fileName, fallback, folderId, dashboardId) {
+  const fileId = await findFileId(fileName, folderId, dashboardId);
   if (!fileId) return fallback;
   const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`);
   if (!response.ok) throw new Error(`Lecture du fichier Drive : ${await describeError(response)}`);
   return response.json();
 }
 
-async function saveJsonFile(fileName, content, folderId) {
-  const fileId = await findFileId(fileName, folderId);
+async function saveJsonFile(fileName, content, folderId, dashboardId) {
+  const fileId = await findFileId(fileName, folderId, dashboardId);
   if (fileId) {
     await updateFile(fileId, content);
     return fileId;
@@ -249,8 +252,10 @@ async function saveJsonFile(fileName, content, folderId) {
 
 // dashboardId optionnel : par défaut le dashboard actif, mais le sélecteur de tableau
 // du formulaire de partage peut cibler un autre dashboard sans y bascule l'app entière.
+// Transmis à loadJsonFile/findFileId pour que la migration legacy (cf findFileId) se
+// base sur le dashboard réellement résolu plutôt que sur l'actif.
 export async function loadEntries(dashboardId) {
-  return loadJsonFile(DATA_FILE_NAME, [], await getDataFolderId(dashboardId));
+  return loadJsonFile(DATA_FILE_NAME, [], await getDataFolderId(dashboardId), dashboardId);
 }
 
 export async function saveEntries(entries) {
