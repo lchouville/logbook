@@ -18,5 +18,14 @@ else
 fi
 
 mkdir -p "$dir/agents" "$dir/rules"
+# agents/ is fully owned by this sync (nothing else lives there): wipe and replace.
+rm -f "$dir"/agents/*.md
 cp -f "$cache"/agents/*.md "$dir/agents/" 2>/dev/null || true
+
+# rules/ also holds project-specific files, so only remove what a *previous*
+# sync put there before copying in what's there now (handles renamed/deleted
+# shared rules without touching unrelated project rules).
+rules_manifest="$dir/.agents-sync-rules-manifest"
+[ -f "$rules_manifest" ] && while IFS= read -r f; do [ -n "$f" ] && rm -f "$dir/rules/$f"; done < "$rules_manifest"
 cp -f "$cache"/rules/*.md "$dir/rules/" 2>/dev/null || true
+(cd "$cache/rules" 2>/dev/null && printf '%s\n' *.md) > "$rules_manifest" || true
