@@ -46,7 +46,7 @@ Pour le partage (voir plus bas), l'API Picker doit aussi être activée dans ce 
 
 ## Stockage Drive
 
-Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dans le dossier `Application/logbook` du Drive de l'utilisateur (créés automatiquement au premier enregistrement si absents, en couleur Lavande `#CD74E6`). `js/drive.js` gère ça avec le scope `drive.file` — l'app ne voit que les fichiers/dossiers qu'elle crée elle-même. Si un ancien `logbook-data.json` traîne à la racine du Drive (créé avant l'introduction de ce dossier), il est automatiquement déplacé dans `Application/logbook` au lieu d'être dupliqué. Modèle d'une entrée (`js/entries.js`) : thème(s), niveau d'accès (N1-N5), statut (A Valider / A Compléter / Complete / Bilan), type de journée, mesures du soir (énergie, ressenti /10), texte, et un `ressentiAFroid` rempli plus tard (pas encore d'UI dédiée).
+Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dans le dossier `Application/logbook` du Drive de l'utilisateur (créés automatiquement au premier enregistrement si absents, en couleur Lavande `#CD74E6`). `js/drive.js` gère ça avec le scope `drive.file` — l'app ne voit que les fichiers/dossiers qu'elle crée elle-même. Si un ancien `logbook-data.json` traîne à la racine du Drive (créé avant l'introduction de ce dossier), il est automatiquement déplacé dans `Application/logbook` au lieu d'être dupliqué. Modèle d'une entrée (`js/entries.js`) : thème(s), niveau d'accès (N1-N5), statut (A Valider / A Compléter / Complete / Bilan), texte, et un `ressentiAFroid` rempli plus tard (pas encore d'UI dédiée).
 
 Les préférences utilisateur (thème pour l'instant) sont stockées dans un second fichier JSON, `logbook-settings.json`, dans le même dossier `Application/logbook`. `js/drive.js` expose `loadSettings`/`saveSettings` en généralisant la logique de lecture/écriture déjà utilisée pour `logbook-data.json`.
 
@@ -115,7 +115,7 @@ Le flux OAuth implicite de Google (`initTokenClient`, utilisé ici) ne délivre 
 - [x] Implémenter la connexion Google (Google Identity Services).
 - [x] Activer GitHub Pages sur la branche `gh-page`.
 - [x] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
-- [x] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, mesures du soir (énergie, ressenti /10), type de journée, ressenti à froid.
+- [x] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, ressenti à froid.
 - [x] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).
 - [x] Thème clair/sombre/appareil, par défaut proche de Notion, préférence stockée dans `logbook-settings.json`.
 - [ ] Import de thèmes personnalisés depuis un dossier partagé (structure à définir).

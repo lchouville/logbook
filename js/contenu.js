@@ -1,4 +1,98 @@
-import { createTexteBlock, createTableauBlock } from './entries.js';
+import { createTexteBlock, createTableauBlock, formatDateFrCourt } from './entries.js';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+// Palette catégorielle validée (voir skill dataviz) : ordre fixe, jamais cyclé
+// au hasard — 5 créneaux suffisent pour les mesures numériques du rituel.
+const GRAPHIQUE_SERIES = ['--series-1', '--series-2', '--series-3', '--series-4', '--series-5'];
+
+function buildGraphiqueBlockContent(value) {
+  const series = (value?.series ?? []).filter((s) => s.points.some((p) => p.valeur != null));
+  if (series.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'contenu-graphique-vide';
+    p.textContent = 'Pas encore de données pour cette période.';
+    return p;
+  }
+
+  const width = 560;
+  const height = 220;
+  const padding = { top: 12, right: 24, bottom: 24, left: 24 };
+  const plotW = width - padding.left - padding.right;
+  const plotH = height - padding.top - padding.bottom;
+  const dates = series[0].points.map((p) => p.date);
+  const maxValeur = Math.max(10, ...series.flatMap((s) => s.points.map((p) => p.valeur ?? 0)));
+  const x = (i) => padding.left + (dates.length === 1 ? plotW / 2 : (i * plotW) / (dates.length - 1));
+  const y = (v) => padding.top + plotH - (v / maxValeur) * plotH;
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('class', 'contenu-graphique-svg');
+
+  const axeX = document.createElementNS(SVG_NS, 'line');
+  axeX.setAttribute('x1', padding.left);
+  axeX.setAttribute('x2', width - padding.right);
+  axeX.setAttribute('y1', height - padding.bottom);
+  axeX.setAttribute('y2', height - padding.bottom);
+  axeX.setAttribute('class', 'contenu-graphique-axe');
+  svg.appendChild(axeX);
+
+  dates.forEach((date, i) => {
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', x(i));
+    label.setAttribute('y', height - 6);
+    // Ancrage aux bords pour que les étiquettes des deux extrémités ne
+    // débordent pas hors du viewBox (sinon le premier caractère se fait
+    // couper, ex. « 11 nov. » affiché « 1 nov. »).
+    const ancrage = i === 0 ? 'start' : i === dates.length - 1 ? 'end' : 'middle';
+    label.setAttribute('text-anchor', ancrage);
+    label.setAttribute('class', 'contenu-graphique-label');
+    label.textContent = formatDateFrCourt(date);
+    svg.appendChild(label);
+  });
+
+  series.forEach((serie, idx) => {
+    const colorVar = `var(${GRAPHIQUE_SERIES[idx % GRAPHIQUE_SERIES.length]})`;
+    const pointsAttr = serie.points
+      .map((p, i) => (p.valeur == null ? null : `${x(i)},${y(p.valeur)}`))
+      .filter(Boolean)
+      .join(' ');
+    const polyline = document.createElementNS(SVG_NS, 'polyline');
+    polyline.setAttribute('points', pointsAttr);
+    polyline.setAttribute('class', 'contenu-graphique-ligne');
+    polyline.style.stroke = colorVar;
+    svg.appendChild(polyline);
+
+    for (const [i, p] of serie.points.entries()) {
+      if (p.valeur == null) continue;
+      const cercle = document.createElementNS(SVG_NS, 'circle');
+      cercle.setAttribute('cx', x(i));
+      cercle.setAttribute('cy', y(p.valeur));
+      cercle.setAttribute('r', '4');
+      cercle.setAttribute('class', 'contenu-graphique-point');
+      cercle.style.fill = colorVar;
+      svg.appendChild(cercle);
+    }
+  });
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'contenu-graphique';
+  wrapper.appendChild(svg);
+
+  const legende = document.createElement('ul');
+  legende.className = 'contenu-graphique-legende';
+  series.forEach((serie, idx) => {
+    const li = document.createElement('li');
+    const puce = document.createElement('span');
+    puce.className = 'contenu-graphique-puce';
+    puce.style.background = `var(${GRAPHIQUE_SERIES[idx % GRAPHIQUE_SERIES.length]})`;
+    li.appendChild(puce);
+    li.appendChild(document.createTextNode(serie.nom));
+    legende.appendChild(li);
+  });
+  wrapper.appendChild(legende);
+
+  return wrapper;
+}
 
 function buildTexteBlockContent(block, value, idPrefix) {
   const textarea = document.createElement('textarea');
@@ -116,9 +210,14 @@ function buildTableauBlockContent(block, value, idPrefix, locked, onMutate) {
   return table;
 }
 
-function readBlockValue(listEl, block, idPrefix) {
+function readBlockValue(listEl, block, idPrefix, currentValue) {
   if (block.type === 'texte') {
     return listEl.querySelector(`#${idPrefix}-${block.id}`)?.value ?? '';
+  }
+  // Bloc calculé automatiquement (ex. graphique de bilan) : aucune saisie,
+  // on renvoie sa valeur telle quelle.
+  if (block.type === 'graphique') {
+    return currentValue;
   }
   const blockValues = {};
   for (const ligne of block.lignes) {
@@ -143,7 +242,7 @@ export function createContentEditor({ listEl, addTexteButtonEl, addTableauButton
   function readValues() {
     const result = {};
     for (const block of schema.blocks) {
-      result[block.id] = readBlockValue(listEl, block, idPrefix);
+      result[block.id] = readBlockValue(listEl, block, idPrefix, values[block.id]);
     }
     return result;
   }
@@ -181,6 +280,8 @@ export function createContentEditor({ listEl, addTexteButtonEl, addTableauButton
       card.appendChild(buildTexteBlockContent(block, values[block.id], idPrefix));
     } else if (block.type === 'tableau') {
       card.appendChild(buildTableauBlockContent(block, values[block.id], idPrefix, locked, onMutate));
+    } else if (block.type === 'graphique') {
+      card.appendChild(buildGraphiqueBlockContent(values[block.id]));
     }
     return card;
   }

@@ -1,0 +1,13 @@
+{
+  "nom": "Journée standard",
+  "themes": [],
+  "niveauAcces": "",
+  "statut": "",
+  "champsPersonnalises": {},
+  "champsSchema": { "fields": [], "order": [] },
+  "contenuSchema": {
+    "blocks": [{ "id": "texte", "type": "texte", "titre": "Texte" }],
+    "order": ["texte"]
+  },
+  "contenuValeursParDefaut": {}
+}

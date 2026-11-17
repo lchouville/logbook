@@ -27,7 +27,7 @@ function renderViewerLoading() {
   viewerTableBody.innerHTML = '';
   const row = document.createElement('tr');
   const td = document.createElement('td');
-  td.colSpan = 9;
+  td.colSpan = 7;
   td.textContent = 'Chargement…';
   row.appendChild(td);
   viewerTableBody.appendChild(row);
@@ -43,8 +43,6 @@ function renderViewerEntries(entries) {
     appendCell(row, entry.themes.join(', '));
     appendCell(row, entry.niveauAcces);
     appendCell(row, entry.statut);
-    appendCell(row, entry.mesuresSoir?.energie ?? '—');
-    appendCell(row, entry.mesuresSoir?.ressenti ?? '—');
     appendCell(row, previewContenuTexte(entry));
     appendCell(row, entry.ressentiAFroid != null ? `${entry.ressentiAFroid}/10` : '—');
 

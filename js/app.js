@@ -27,10 +27,11 @@ import {
   migrateEntryContenu,
   migrateModeleContenu,
   previewContenuTexte,
+  resolveTitreModele,
+  buildBilanRituelDuSoir,
   NIVEAUX_ACCES,
   STATUTS,
   THEMES,
-  TYPES_JOURNEE,
   FIXED_BLOCK_KEYS,
 } from './entries.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
@@ -50,22 +51,24 @@ const themeSelect = document.getElementById('theme-select');
 const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
+const modelesSection = document.getElementById('modeles');
+const modeleNewButton = document.getElementById('modele-new-button');
+const modeleFormTitle = document.getElementById('modele-form-title');
+const modeleFormError = document.getElementById('modele-form-error');
 const entryNewButton = document.getElementById('entry-new-button');
 const entryNewMenu = document.getElementById('entry-new-menu');
 const entryForm = document.getElementById('entry-form');
 const entryFormTitle = document.getElementById('entry-form-title');
 const entrySubmitButton = document.getElementById('entry-submit');
+const entryDeleteButton = document.getElementById('entry-delete');
 const entryTitre = document.getElementById('entry-titre');
 const entryThemes = document.getElementById('entry-themes');
 const entryNiveau = document.getElementById('entry-niveau');
 const entryStatut = document.getElementById('entry-statut');
-const entryTypeJournee = document.getElementById('entry-type-journee');
-const entryEnergie = document.getElementById('entry-energie');
-const entryRessenti = document.getElementById('entry-ressenti');
 const entryContenuList = document.getElementById('entry-contenu-list');
 const entryContenuAddTexte = document.getElementById('entry-contenu-add-texte');
 const entryContenuAddTableau = document.getElementById('entry-contenu-add-tableau');
-const entryDateDisplay = document.getElementById('entry-date-display');
+const entryDate = document.getElementById('entry-date');
 const entryRessentiFroidSlot = document.getElementById('entry-ressenti-froid-slot');
 const entryBlocksList = document.getElementById('entry-blocks-list');
 const entryAddFieldButton = document.getElementById('entry-add-field-button');
@@ -83,12 +86,10 @@ const partagesRecusList = document.getElementById('partages-recus-list');
 const partagesRecusError = document.getElementById('partages-recus-error');
 const modeleForm = document.getElementById('modele-form');
 const modeleNom = document.getElementById('modele-nom');
+const modeleTitrePattern = document.getElementById('modele-titre-pattern');
 const modeleThemes = document.getElementById('modele-themes');
 const modeleNiveau = document.getElementById('modele-niveau');
 const modeleStatut = document.getElementById('modele-statut');
-const modeleTypeJournee = document.getElementById('modele-type-journee');
-const modeleEnergie = document.getElementById('modele-energie');
-const modeleRessenti = document.getElementById('modele-ressenti');
 const modeleContenuList = document.getElementById('modele-contenu-list');
 const modeleContenuAddTexte = document.getElementById('modele-contenu-add-texte');
 const modeleContenuAddTableau = document.getElementById('modele-contenu-add-tableau');
@@ -97,6 +98,7 @@ const modeleAddFieldButton = document.getElementById('modele-add-field-button');
 const modeleSubmit = document.getElementById('modele-submit');
 const modeleCancel = document.getElementById('modele-cancel');
 const modeleList = document.getElementById('modele-list');
+const modeleListDefaut = document.getElementById('modele-list-defaut');
 const modeleError = document.getElementById('modele-error');
 
 let entries = [];
@@ -107,9 +109,13 @@ let modeles = [];
 let editingPartageId = null;
 let editingEntryId = null;
 let editingEntryModeleId = null;
+let activeTitrePattern = null;
+let activeTitreRang = null;
+let activeCalculAuto = null;
 let editingModeleId = null;
 let ownerName = null;
 let currentJournalId = null;
+let modelesViewActive = false;
 
 function buildSharedFileName(nom) {
   return `${(ownerName ?? 'Logbook').trim()} — ${nom.trim()}.json`;
@@ -151,11 +157,9 @@ function populateSelect(select, options) {
 populateSelect(entryThemes, THEMES);
 populateSelect(entryNiveau, NIVEAUX_ACCES);
 populateSelect(entryStatut, STATUTS);
-populateSelect(entryTypeJournee, TYPES_JOURNEE);
 populateSelect(modeleThemes, THEMES);
 populateSelect(modeleNiveau, NIVEAUX_ACCES);
 populateSelect(modeleStatut, STATUTS);
-populateSelect(modeleTypeJournee, TYPES_JOURNEE);
 
 function blankChampsSchema() {
   return { fields: [], order: [...FIXED_BLOCK_KEYS] };
@@ -361,12 +365,15 @@ function renderEntries() {
 function stopEditEntry() {
   editingEntryId = null;
   editingEntryModeleId = null;
+  activeTitrePattern = null;
+  activeCalculAuto = null;
   entryForm.reset();
   entryRessentiFroidSlot.hidden = true;
   entryRessentiFroidSlot.innerHTML = '';
-  entryDateDisplay.textContent = new Date().toISOString().slice(0, 10);
+  entryDate.value = new Date().toISOString().slice(0, 10);
   entryFormTitle.textContent = 'Nouvelle entrée';
   entrySubmitButton.textContent = 'Enregistrer';
+  entryDeleteButton.hidden = true;
   entryError.textContent = '';
 }
 
@@ -374,18 +381,12 @@ function applyFixedFieldsToForm(fields, els) {
   for (const option of els.themes.options) option.selected = (fields.themes ?? []).includes(option.value);
   els.niveau.value = fields.niveauAcces ?? '';
   els.statut.value = fields.statut ?? '';
-  els.typeJournee.value = fields.typeJournee ?? '';
-  els.energie.value = fields.energie ?? fields.mesuresSoir?.energie ?? '';
-  els.ressenti.value = fields.ressenti ?? fields.mesuresSoir?.ressenti ?? '';
 }
 
 const entryFixedFieldEls = {
   themes: entryThemes,
   niveau: entryNiveau,
   statut: entryStatut,
-  typeJournee: entryTypeJournee,
-  energie: entryEnergie,
-  ressenti: entryRessenti,
 };
 
 function startEditEntry(entry) {
@@ -393,13 +394,14 @@ function startEditEntry(entry) {
   editingEntryModeleId = entry.modeleId ?? null;
   entryTitre.value = entry.titre ?? '';
   applyFixedFieldsToForm(entry, entryFixedFieldEls);
-  entryDateDisplay.textContent = entry.date;
+  entryDate.value = entry.date;
   entryRessentiFroidSlot.hidden = false;
   renderRessentiAFroidSlot(entry);
   entryFieldsEditor.render(entry.champsSchema ?? blankChampsSchema(), entry.champsPersonnalises ?? {});
   entryContentEditor.render(entry.contenuSchema, entry.contenuValeurs ?? {}, Boolean(entry.modeleId));
   entryFormTitle.textContent = 'Modifier l’entrée';
   entrySubmitButton.textContent = 'Enregistrer les modifications';
+  entryDeleteButton.hidden = false;
   entryError.textContent = '';
   openModal('entry-form-modal');
 }
@@ -422,9 +424,21 @@ function cloneContenuSchema(schema) {
   };
 }
 
+function renderBilanRituelContenu(dateIso) {
+  const rituelModele = modeles.find((m) => m.nom === 'Rituel du soir');
+  const entriesRituel = rituelModele ? entries.filter((e) => e.modeleId === rituelModele.id) : [];
+  const { contenuSchema, contenuValeurs } = buildBilanRituelDuSoir(entriesRituel, dateIso);
+  entryContentEditor.render(contenuSchema, contenuValeurs, true);
+}
+
 function applyModeleToForm(modele) {
   stopEditEntry();
   editingEntryModeleId = modele.id;
+  if (modele.titrePattern) {
+    activeTitrePattern = modele.titrePattern;
+    activeTitreRang = entries.filter((e) => e.modeleId === modele.id).length + 1;
+    entryTitre.value = resolveTitreModele(activeTitrePattern, { date: entryDate.value, id: activeTitreRang });
+  }
   applyFixedFieldsToForm(modele, entryFixedFieldEls);
   const modeleSchema = modele.champsSchema ?? { fields: [], order: [] };
   entryFieldsEditor.render(
@@ -434,11 +448,16 @@ function applyModeleToForm(modele) {
     },
     { ...(modele.champsPersonnalises ?? {}) },
   );
-  entryContentEditor.render(
-    cloneContenuSchema(modele.contenuSchema),
-    { ...(modele.contenuValeursParDefaut ?? {}) },
-    true,
-  );
+  if (modele.calculAuto === 'bilan-rituel-du-soir') {
+    activeCalculAuto = modele.calculAuto;
+    renderBilanRituelContenu(entryDate.value);
+  } else {
+    entryContentEditor.render(
+      cloneContenuSchema(modele.contenuSchema),
+      { ...(modele.contenuValeursParDefaut ?? {}) },
+      true,
+    );
+  }
   openModal('entry-form-modal');
 }
 
@@ -577,9 +596,6 @@ function readModeleFixedFields() {
     themes: Array.from(modeleThemes.selectedOptions).map((option) => option.value),
     niveauAcces: modeleNiveau.value,
     statut: modeleStatut.value,
-    typeJournee: modeleTypeJournee.value,
-    energie: modeleEnergie.valueAsNumber,
-    ressenti: modeleRessenti.valueAsNumber,
   };
 }
 
@@ -587,20 +603,20 @@ const modeleFixedFieldEls = {
   themes: modeleThemes,
   niveau: modeleNiveau,
   statut: modeleStatut,
-  typeJournee: modeleTypeJournee,
-  energie: modeleEnergie,
-  ressenti: modeleRessenti,
 };
 
 function startEditModele(modele) {
   editingModeleId = modele.id;
   modeleNom.value = modele.nom;
+  modeleTitrePattern.value = modele.titrePattern ?? '';
   applyFixedFieldsToForm(modele, modeleFixedFieldEls);
   modeleFieldsEditor.render(modele.champsSchema ?? { fields: [], order: [] }, modele.champsPersonnalises ?? {});
   modeleContentEditor.render(modele.contenuSchema, modele.contenuValeursParDefaut ?? {}, false);
+  modeleFormTitle.textContent = 'Modifier le modèle';
   modeleSubmit.textContent = 'Enregistrer les modifications';
   modeleCancel.hidden = false;
-  modeleError.textContent = '';
+  modeleFormError.textContent = '';
+  openModal('modele-form-modal');
 }
 
 function stopEditModele() {
@@ -608,9 +624,33 @@ function stopEditModele() {
   modeleForm.reset();
   modeleFieldsEditor.render({ fields: [], order: [] }, {});
   modeleContentEditor.render(blankContenuSchema(), {}, false);
+  modeleFormTitle.textContent = 'Nouveau modèle';
   modeleSubmit.textContent = 'Créer le modèle';
   modeleCancel.hidden = true;
+  modeleFormError.textContent = '';
 }
+
+function renderModelesDefaut(modelesDefaut) {
+  modeleListDefaut.innerHTML = '';
+  for (const modele of modelesDefaut) {
+    const li = document.createElement('li');
+    const nom = document.createElement('p');
+    nom.textContent = modele.nom;
+    li.appendChild(nom);
+    modeleListDefaut.appendChild(li);
+  }
+}
+
+async function loadModelesDefaut() {
+  const index = await (await fetch('models/index.json')).json();
+  return Promise.all(index.map(async (fichier) => (await fetch(`models/${fichier}`)).json()));
+}
+
+loadModelesDefaut()
+  .then(renderModelesDefaut)
+  .catch((error) => {
+    modeleError.textContent = `Échec du chargement des modèles par défaut : ${error.message}`;
+  });
 
 function renderModeles() {
   modeleList.innerHTML = '';
@@ -658,23 +698,80 @@ async function deleteModele(modele) {
   }
 }
 
-modeleCancel.addEventListener('click', stopEditModele);
+function diffChampsSchema(oldSchema, newSchema) {
+  const oldIds = new Set(oldSchema.fields.map((f) => f.id));
+  const newIds = new Set(newSchema.fields.map((f) => f.id));
+  return {
+    added: newSchema.fields.filter((f) => !oldIds.has(f.id)),
+    removed: oldSchema.fields.filter((f) => !newIds.has(f.id)),
+  };
+}
+
+// Les entrées copient le champsSchema du modèle au moment de leur création
+// (pas de référence vivante) : on répercute ici les propriétés ajoutées
+// (valeur vide) ou retirées (selon le choix de l'utilisateur) sur les
+// entrées déjà créées via ce modèle.
+function syncEntriesChampsSchema(modeleId, added, removed, deleteRemovedValues) {
+  const removedIds = new Set(removed.map((f) => f.id));
+  return entries.map((entry) => {
+    if (entry.modeleId !== modeleId) return entry;
+    let fields = entry.champsSchema?.fields ?? [];
+    let order = entry.champsSchema?.order ?? [];
+    const champsPersonnalises = { ...entry.champsPersonnalises };
+
+    for (const field of added) {
+      if (fields.some((f) => f.id === field.id)) continue;
+      fields = [...fields, { ...field }];
+      order = [...order, field.id];
+    }
+
+    if (deleteRemovedValues) {
+      fields = fields.filter((f) => !removedIds.has(f.id));
+      order = order.filter((id) => !removedIds.has(id));
+      for (const field of removed) delete champsPersonnalises[field.id];
+    }
+
+    return { ...entry, champsSchema: { fields, order }, champsPersonnalises };
+  });
+}
+
+modeleCancel.addEventListener('click', () => {
+  stopEditModele();
+  closeModal();
+});
 
 modeleForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  modeleError.textContent = '';
+  modeleFormError.textContent = '';
   const nom = modeleNom.value.trim();
+  const titrePattern = modeleTitrePattern.value.trim();
   const fixed = readModeleFixedFields();
   const champsPersonnalises = modeleFieldsEditor.getValues();
   const champsSchema = modeleFieldsEditor.getSchema();
   const contenuSchema = modeleContentEditor.getSchema();
   const contenuValeursParDefaut = modeleContentEditor.getValues();
   const previousModeles = modeles;
+  const previousEntries = entries;
+  let entriesChanged = false;
 
   if (editingModeleId) {
+    const previousModele = modeles.find((m) => m.id === editingModeleId);
+    const { added, removed } = diffChampsSchema(previousModele?.champsSchema ?? { fields: [], order: [] }, champsSchema);
+    let deleteRemovedValues = false;
+    if (removed.length > 0 && entries.some((e) => e.modeleId === editingModeleId)) {
+      deleteRemovedValues = window.confirm(
+        `Ce modèle retire la propriété « ${removed.map((f) => f.nom).join(' », « ')} ».\n\n` +
+          `La supprimer aussi des entrées déjà créées via ce modèle ?\n` +
+          `OK = la supprimer aussi des entrées\nAnnuler = conserver les valeurs déjà saisies`,
+      );
+    }
+    if (added.length > 0 || removed.length > 0) {
+      entries = syncEntriesChampsSchema(editingModeleId, added, removed, deleteRemovedValues);
+      entriesChanged = true;
+    }
     modeles = modeles.map((m) =>
       m.id === editingModeleId
-        ? { ...m, nom, ...fixed, champsPersonnalises, champsSchema, contenuSchema, contenuValeursParDefaut }
+        ? { ...m, nom, titrePattern, ...fixed, champsPersonnalises, champsSchema, contenuSchema, contenuValeursParDefaut }
         : m,
     );
   } else {
@@ -683,6 +780,7 @@ modeleForm.addEventListener('submit', async (event) => {
       {
         id: crypto.randomUUID(),
         nom,
+        titrePattern,
         ...fixed,
         champsPersonnalises,
         champsSchema,
@@ -694,20 +792,30 @@ modeleForm.addEventListener('submit', async (event) => {
   }
   renderModeles();
   renderEntryNewMenu();
+  if (entriesChanged) renderEntries();
   try {
     await saveModeles(modeles);
+    if (entriesChanged) await saveEntries(entries);
     stopEditModele();
+    closeModal();
   } catch (error) {
     modeles = previousModeles;
+    entries = previousEntries;
     renderModeles();
     renderEntryNewMenu();
-    modeleError.textContent = `Échec de l'enregistrement du modèle : ${error.message}`;
+    if (entriesChanged) renderEntries();
+    modeleFormError.textContent = `Échec de l'enregistrement du modèle : ${error.message}`;
   }
 });
 
 function renderMainView() {
-  if (currentJournalId) {
-    entriesSection.hidden = true;
+  entriesSection.hidden = true;
+  journalPartageSection.hidden = true;
+  modelesSection.hidden = true;
+
+  if (modelesViewActive) {
+    modelesSection.hidden = false;
+  } else if (currentJournalId) {
     journalPartageSection.hidden = false;
     renderJournalPartage(currentJournalId, (updated) => {
       partagesRecus = updated;
@@ -716,11 +824,11 @@ function renderMainView() {
     });
   } else {
     entriesSection.hidden = false;
-    journalPartageSection.hidden = true;
   }
 }
 
 function setJournalId(fichierId) {
+  modelesViewActive = false;
   currentJournalId = fichierId;
   const url = new URL(window.location.href);
   if (fichierId) {
@@ -746,7 +854,16 @@ initSidebar({
   onOpenSettings: () => openModal('settings'),
   onOpenPartages: () => openModal('partages'),
   onOpenAcces: () => openModal('partages-recus'),
-  onOpenModeles: () => openModal('modeles'),
+  onOpenModeles: () => {
+    modelesViewActive = true;
+    renderMainView();
+    closeSidebarOnMobile();
+  },
+});
+
+modeleNewButton.addEventListener('click', () => {
+  stopEditModele();
+  openModal('modele-form-modal');
 });
 
 signInButton.addEventListener('click', signIn);
@@ -805,6 +922,16 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !entryNewMenu.hidden) closeEntryNewMenu();
 });
 
+entryDate.addEventListener('change', () => {
+  if (editingEntryId) return;
+  if (activeTitrePattern) {
+    entryTitre.value = resolveTitreModele(activeTitrePattern, { date: entryDate.value, id: activeTitreRang });
+  }
+  if (activeCalculAuto === 'bilan-rituel-du-soir') {
+    renderBilanRituelContenu(entryDate.value);
+  }
+});
+
 entryTableBody.addEventListener('click', (event) => {
   const row = event.target.closest('tr');
   const entry = row && entries.find((e) => e.id === row.dataset.entryId);
@@ -825,12 +952,10 @@ entryForm.addEventListener('submit', async (event) => {
     const original = entries.find((e) => e.id === editingEntryId);
     const updated = updateEntry(original, {
       titre: entryTitre.value.trim(),
+      date: entryDate.value,
       themes,
       niveauAcces: entryNiveau.value,
       statut: entryStatut.value,
-      typeJournee: entryTypeJournee.value,
-      energie: entryEnergie.valueAsNumber,
-      ressenti: entryRessenti.valueAsNumber,
       champsPersonnalises,
       champsSchema,
       contenuSchema,
@@ -840,13 +965,10 @@ entryForm.addEventListener('submit', async (event) => {
   } else {
     const entry = createEntry({
       titre: entryTitre.value.trim(),
-      date: new Date().toISOString().slice(0, 10),
+      date: entryDate.value,
       themes,
       niveauAcces: entryNiveau.value,
       statut: entryStatut.value,
-      typeJournee: entryTypeJournee.value,
-      energie: entryEnergie.valueAsNumber,
-      ressenti: entryRessenti.valueAsNumber,
       champsPersonnalises,
       champsSchema,
       modeleId: editingEntryModeleId,
@@ -865,6 +987,24 @@ entryForm.addEventListener('submit', async (event) => {
   } catch (error) {
     entries = previousEntries;
     entryError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
+
+entryDeleteButton.addEventListener('click', async () => {
+  if (!editingEntryId) return;
+  if (!window.confirm('Supprimer définitivement cette entrée ?')) return;
+  entryError.textContent = '';
+  const previousEntries = entries;
+  entries = entries.filter((e) => e.id !== editingEntryId);
+  try {
+    await saveEntries(entries);
+    await syncPartages();
+    renderEntries();
+    stopEditEntry();
+    closeModal();
+  } catch (error) {
+    entries = previousEntries;
+    entryError.textContent = `Échec de la suppression : ${error.message}`;
   }
 });
 
@@ -1027,6 +1167,7 @@ onAuthChange(async (token) => {
     modeles = [];
     ownerName = null;
     currentJournalId = null;
+    modelesViewActive = false;
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
     renderEntries();
