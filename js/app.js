@@ -1,4 +1,4 @@
-import { onAuthChange, signIn, signOut } from './auth.js';
+import { onAuthChange, signIn, signOut, getSessionDuration, setSessionDuration } from './auth.js';
 import {
   loadEntries,
   saveEntries,
@@ -52,6 +52,7 @@ const appShell = document.getElementById('app-shell');
 const signOutButton = document.getElementById('sign-out');
 
 const themeSelect = document.getElementById('theme-select');
+const sessionDurationSelect = document.getElementById('session-duration-select');
 const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
@@ -148,6 +149,12 @@ function buildPartageLink(fichierId) {
 function getJournalIdFromUrl() {
   return new URLSearchParams(window.location.search).get('journal');
 }
+
+// Préférence locale au navigateur (pas de Drive) : affichable/modifiable dès le départ.
+sessionDurationSelect.value = getSessionDuration();
+sessionDurationSelect.addEventListener('change', () => {
+  setSessionDuration(sessionDurationSelect.value);
+});
 
 themeSelect.addEventListener('change', async () => {
   settingsError.textContent = '';
