@@ -3,7 +3,7 @@ const modalBackdrop = document.getElementById('modal-backdrop');
 const modalPanel = document.getElementById('modal-panel');
 const modalClose = document.getElementById('modal-close');
 
-const SECTION_IDS = ['entry-form-modal', 'settings', 'partages', 'partages-recus', 'modele-form-modal'];
+const SECTION_IDS = ['entry-form-modal', 'modele-form-modal'];
 const WIDE_SECTION_IDS = ['entry-form-modal', 'modele-form-modal'];
 const closeListeners = [];
 

@@ -415,6 +415,7 @@ form button[type="submit"] {
   background: var(--color-bg-hover);
 }
 
+#sidebar-dashboards,
 #sidebar-journaux {
   list-style: none;
   padding: 0;
@@ -424,6 +425,12 @@ form button[type="submit"] {
   gap: 0.25rem;
 }
 
+#sidebar-dashboards-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+}
+
+#sidebar-dashboards button,
 #sidebar-journaux button,
 #sidebar-journaux-plus,
 #sidebar-partage-button,
@@ -435,6 +442,7 @@ form button[type="submit"] {
   border-color: transparent;
 }
 
+#sidebar-dashboards button:hover,
 #sidebar-journaux button:hover,
 #sidebar-journaux-plus:hover,
 #sidebar-partage-button:hover,
@@ -442,6 +450,7 @@ form button[type="submit"] {
   background: var(--color-bg-hover);
 }
 
+#sidebar-dashboards button[aria-current="true"],
 #sidebar-journaux button[aria-current="true"] {
   background: var(--color-accent);
   border-color: var(--color-accent);

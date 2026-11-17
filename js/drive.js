@@ -9,6 +9,7 @@ const PARTAGES_FILE_NAME = 'logbook-partages.json';
 const MODELES_FILE_NAME = 'logbook-modeles.json';
 const PARTAGES_RECUS_FILE_NAME = 'logbook-partages-recus.json';
 const PARTAGES_RECUS_FOLDER_NAME = 'partages-recus';
+const DASHBOARDS_FILE_NAME = 'logbook-dashboards.json';
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 const SHORTCUT_MIME_TYPE = 'application/vnd.google-apps.shortcut';
 const FOLDER_COLOR = '#cd74e6'; // Lavande (palette officielle Google Drive)
@@ -19,7 +20,19 @@ const DRIVE_ABOUT_URL = 'https://www.googleapis.com/drive/v3/about';
 let folderIdCache = null;
 let partagesFolderIdCache = null;
 let partagesRecusFolderIdCache = null;
+let appFolderIdCache = null;
+let activeDashboardId = 'default';
 const fileIdCache = new Map();
+
+// Change de dashboard actif et vide tous les caches : les ids de dossier/fichier
+// résolus dépendent du dashboard, donc les garder pointerait vers l'ancien dossier.
+export function setActiveDashboard(dashboardId) {
+  activeDashboardId = dashboardId;
+  folderIdCache = null;
+  partagesFolderIdCache = null;
+  partagesRecusFolderIdCache = null;
+  fileIdCache.clear();
+}
 
 function authHeaders() {
   const token = getAccessToken();
@@ -81,18 +94,63 @@ async function findOrCreateFolder(name, parentId) {
   return existing ?? createFolder(name, parentId);
 }
 
-async function getDataFolderId() {
-  if (folderIdCache) return folderIdCache;
-  const appFolderId = await findOrCreateFolder(APP_FOLDER_NAME, null);
-  folderIdCache = await findOrCreateFolder(DATA_FOLDER_NAME, appFolderId);
-  return folderIdCache;
+async function getAppFolderId() {
+  if (appFolderIdCache) return appFolderIdCache;
+  appFolderIdCache = await findOrCreateFolder(APP_FOLDER_NAME, null);
+  return appFolderIdCache;
 }
 
-async function getPartagesFolderId() {
-  if (partagesFolderIdCache) return partagesFolderIdCache;
-  const dataFolderId = await getDataFolderId();
-  partagesFolderIdCache = await findOrCreateFolder(PARTAGES_FOLDER_NAME, dataFolderId);
-  return partagesFolderIdCache;
+export async function loadDashboards() {
+  const appFolderId = await getAppFolderId();
+  const dashboards = await loadJsonFile(DASHBOARDS_FILE_NAME, null, appFolderId);
+  if (dashboards) return dashboards;
+  // Migration : pas encore de registre -> le dossier "logbook" existant devient le dashboard "default".
+  const defaultDashboards = [
+    { id: 'default', nom: 'Mon journal de bord', dossierNom: DATA_FOLDER_NAME, creeLe: new Date().toISOString() },
+  ];
+  await saveJsonFile(DASHBOARDS_FILE_NAME, defaultDashboards, appFolderId);
+  return defaultDashboards;
+}
+
+export async function saveDashboards(dashboards) {
+  return saveJsonFile(DASHBOARDS_FILE_NAME, dashboards, await getAppFolderId());
+}
+
+export async function createDashboardFolder(dossierNom) {
+  return findOrCreateFolder(dossierNom, await getAppFolderId());
+}
+
+// dashboardId par défaut = le dashboard actif ; un appelant peut passer un autre id
+// (ex. le sélecteur de tableau dans le partage) sans toucher au dashboard actif ni à
+// son cache, puisque seul le résultat pour activeDashboardId est mis en cache ici.
+async function getDataFolderId(dashboardId = activeDashboardId) {
+  if (dashboardId === activeDashboardId && folderIdCache) return folderIdCache;
+  const appFolderId = await getAppFolderId();
+  const dashboards = await loadDashboards();
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) throw new Error('Dashboard inconnu : ' + dashboardId);
+  // dossierId est déjà connu depuis la création : l'utiliser directement évite de
+  // re-chercher le dossier par nom juste après sa création, requête sujette au délai
+  // d'indexation de la recherche Drive (le dossier peut ne pas encore être trouvable).
+  // Les anciens registres (dashboard "default" migré) n'ont pas encore de dossierId :
+  // on le résout une fois par nom puis on le persiste, pour que tous les dashboards
+  // soient ensuite stockés de la même façon.
+  let folderId = dashboard.dossierId;
+  if (!folderId) {
+    folderId = await findOrCreateFolder(dashboard.dossierNom ?? DATA_FOLDER_NAME, appFolderId);
+    dashboard.dossierId = folderId;
+    await saveJsonFile(DASHBOARDS_FILE_NAME, dashboards, appFolderId);
+  }
+  if (dashboardId === activeDashboardId) folderIdCache = folderId;
+  return folderId;
+}
+
+async function getPartagesFolderId(dashboardId = activeDashboardId) {
+  if (dashboardId === activeDashboardId && partagesFolderIdCache) return partagesFolderIdCache;
+  const dataFolderId = await getDataFolderId(dashboardId);
+  const folderId = await findOrCreateFolder(PARTAGES_FOLDER_NAME, dataFolderId);
+  if (dashboardId === activeDashboardId) partagesFolderIdCache = folderId;
+  return folderId;
 }
 
 async function getPartagesRecusFolderId() {
@@ -125,7 +183,11 @@ async function migrateLegacyFile(folderId) {
 }
 
 async function findFileId(fileName, folderId) {
-  if (fileIdCache.has(fileName)) return fileIdCache.get(fileName);
+  // Clé incluant le dossier : un même nom de fichier (logbook-data.json, etc.) existe
+  // dans le dossier de chaque dashboard, un cache par nom seul renverrait l'id du
+  // mauvais dossier dès qu'on lit deux dashboards différents dans la même session.
+  const cacheKey = `${folderId}:${fileName}`;
+  if (fileIdCache.has(cacheKey)) return fileIdCache.get(cacheKey);
   const params = new URLSearchParams({
     q: `name='${fileName}' and trashed=false and '${folderId}' in parents`,
     spaces: 'drive',
@@ -134,8 +196,12 @@ async function findFileId(fileName, folderId) {
   const response = await driveFetch(`${DRIVE_FILES_URL}?${params}`);
   if (!response.ok) throw new Error(`Recherche du fichier Drive : ${await describeError(response)}`);
   const data = await response.json();
-  const fileId = data.files?.[0]?.id ?? (fileName === DATA_FILE_NAME ? await migrateLegacyFile(folderId) : null);
-  fileIdCache.set(fileName, fileId);
+  // La migration ne doit jouer que pour le dashboard "default" : sa recherche n'est pas
+  // bornée à un dossier (legacy, fichier posé n'importe où dans le Drive), donc avec
+  // plusieurs dashboards elle irait voler le logbook-data.json d'un autre dashboard.
+  const canMigrate = fileName === DATA_FILE_NAME && activeDashboardId === 'default';
+  const fileId = data.files?.[0]?.id ?? (canMigrate ? await migrateLegacyFile(folderId) : null);
+  fileIdCache.set(cacheKey, fileId);
   return fileId;
 }
 
@@ -151,7 +217,7 @@ async function createFile(fileName, content, folderId) {
   });
   if (!response.ok) throw new Error(`Création du fichier Drive : ${await describeError(response)}`);
   const data = await response.json();
-  fileIdCache.set(fileName, data.id);
+  fileIdCache.set(`${folderId}:${fileName}`, data.id);
   return data.id;
 }
 
@@ -181,8 +247,10 @@ async function saveJsonFile(fileName, content, folderId) {
   return createFile(fileName, content, folderId);
 }
 
-export async function loadEntries() {
-  return loadJsonFile(DATA_FILE_NAME, [], await getDataFolderId());
+// dashboardId optionnel : par défaut le dashboard actif, mais le sélecteur de tableau
+// du formulaire de partage peut cibler un autre dashboard sans y bascule l'app entière.
+export async function loadEntries(dashboardId) {
+  return loadJsonFile(DATA_FILE_NAME, [], await getDataFolderId(dashboardId));
 }
 
 export async function saveEntries(entries) {
@@ -197,24 +265,48 @@ export async function saveSettings(settings) {
   return saveJsonFile(SETTINGS_FILE_NAME, settings, await getDataFolderId());
 }
 
-export async function loadPartages() {
-  return loadJsonFile(PARTAGES_FILE_NAME, [], await getDataFolderId());
+// Les partages restent par dashboard (registre + dossier "partages" propres à chacun) :
+// dashboardId permet au sélecteur du formulaire de partage de lire/écrire ceux d'un
+// autre dashboard que l'actif.
+export async function loadPartages(dashboardId) {
+  return loadJsonFile(PARTAGES_FILE_NAME, [], await getDataFolderId(dashboardId));
 }
 
-export async function savePartages(partages) {
-  return saveJsonFile(PARTAGES_FILE_NAME, partages, await getDataFolderId());
+export async function savePartages(partages, dashboardId) {
+  return saveJsonFile(PARTAGES_FILE_NAME, partages, await getDataFolderId(dashboardId));
 }
 
+// Les modèles sont communs à tous les dashboards (stockés dans le dossier "Application",
+// pas dans celui d'un dashboard) : un seul modèle créé est utilisable partout.
 export async function loadModeles() {
-  return loadJsonFile(MODELES_FILE_NAME, [], await getDataFolderId());
+  const appFolderId = await getAppFolderId();
+  const existing = await loadJsonFile(MODELES_FILE_NAME, null, appFolderId);
+  if (existing) return existing;
+  // Migration : fusionne les modèles déjà présents dans chaque dashboard (avant ce
+  // changement, les modèles étaient stockés par dashboard) en une seule liste globale.
+  const dashboards = await loadDashboards();
+  const merged = [];
+  const seenIds = new Set();
+  for (const dashboard of dashboards) {
+    const folderId = await getDataFolderId(dashboard.id);
+    const dashboardModeles = await loadJsonFile(MODELES_FILE_NAME, [], folderId);
+    for (const modele of dashboardModeles) {
+      if (!seenIds.has(modele.id)) {
+        seenIds.add(modele.id);
+        merged.push(modele);
+      }
+    }
+  }
+  await saveJsonFile(MODELES_FILE_NAME, merged, appFolderId);
+  return merged;
 }
 
 export async function saveModeles(modeles) {
-  return saveJsonFile(MODELES_FILE_NAME, modeles, await getDataFolderId());
+  return saveJsonFile(MODELES_FILE_NAME, modeles, await getAppFolderId());
 }
 
-export async function createSharedFile(fileName, entries) {
-  return createFile(fileName, entries, await getPartagesFolderId());
+export async function createSharedFile(fileName, entries, dashboardId) {
+  return createFile(fileName, entries, await getPartagesFolderId(dashboardId));
 }
 
 export async function updateSharedFile(fileId, entries) {

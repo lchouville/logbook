@@ -50,6 +50,16 @@ Les entrées sont stockées dans un unique fichier JSON `logbook-data.json`, dan
 
 Les préférences utilisateur (thème pour l'instant) sont stockées dans un second fichier JSON, `logbook-settings.json`, dans le même dossier `Application/logbook`. `js/drive.js` expose `loadSettings`/`saveSettings` en généralisant la logique de lecture/écriture déjà utilisée pour `logbook-data.json`.
 
+## Tableaux de bord
+
+Un compte peut avoir plusieurs tableaux de bord (plusieurs jeux d'entrées/thèmes/partages indépendants), par exemple pour séparer vie pro et vie perso. Chaque tableau de bord correspond à un sous-dossier distinct sous `Application/`, qui reprend la structure habituelle (`logbook-data.json`, `logbook-settings.json`, `logbook-partages.json`, `logbook-modeles.json`, `logbook-partages-recus.json`, sous-dossiers `partages/` et `partages-recus/`). La liste des tableaux de bord (`{id, nom, dossierNom, creeLe}`) est stockée dans un registre à part, `logbook-dashboards.json`, directement sous `Application/` (hors de tout dossier de tableau de bord) — fonctions `loadDashboards`/`saveDashboards`/`createDashboardFolder`/`setActiveDashboard` dans `js/drive.js`.
+
+Pour les comptes déjà existants, la migration est automatique et sans déplacement de fichier : au premier chargement du registre absent, le dossier `logbook` actuel devient le tableau de bord `default` ("Mon journal de bord") par simple entrée dans `logbook-dashboards.json`.
+
+Le tableau de bord actif est choisi dans la sidebar (`#sidebar-dashboards` dans `js/sidebar.js`/`index.html`, distinct de la liste des partages reçus `#sidebar-journaux` juste en dessous — **ce sont deux concepts différents** : un *tableau de bord* est un jeu de données possédé par le compte connecté, qu'on peut créer et entre lesquels on bascule ; un *partage reçu* est une vue en lecture seule d'un journal appartenant à un autre compte, ouverte via `?journal=<fichierId>`, voir "Partage" plus bas). L'id du tableau de bord actif est gardé dans `localStorage` (`logbook_active_dashboard_id`), jamais dans l'URL ni dans `logbook-settings.json`. Fonctions côté `js/app.js` : `switchDashboard(dashboardId)` (bascule), `createDashboard()` (demande un nom par prompt, crée le dossier Drive et l'entrée de registre, puis bascule immédiatement dessus), `renameDashboard(dashboardId)` (double-clic sur l'item dans la sidebar ; ne change que le nom affiché dans le registre, pas le dossier Drive physique ni son nom réel).
+
+Hors scope pour l'instant : suppression d'un tableau de bord (pas implémentée). Cette fonctionnalité n'a pas de test automatisé (le projet n'en a pas) — vérifiée par relecture de code et `node --check` (syntaxe) uniquement, pas de test d'intégration Drive réel.
+
 ## Navigation
 
 `index.html` est le shell applicatif unique : une sidebar rétractable (burger sur
@@ -129,3 +139,4 @@ Le flux OAuth implicite de Google (`initTokenClient`, utilisé ici) ne délivre 
 - [x] Reconnexion silencieuse (sans réafficher l'écran de consentement à chaque nouvel onglet, tant que l'utilisateur ne s'est pas déconnecté explicitement).
 - [x] Voir, depuis son propre compte, les tableaux de bord partagés avec soi ("Partages reçus" dans `index.html`).
 - [x] Sidebar rétractable (profil, journaux accessibles, accès à Partage/Paramètres) et navigation inline entre journaux sans rechargement.
+- [x] Plusieurs tableaux de bord par compte (créer, nommer, renommer, basculer) — migration automatique des comptes existants, suppression hors scope.

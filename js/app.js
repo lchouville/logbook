@@ -17,6 +17,10 @@ import {
   deleteSharedFile,
   loadPartagesRecus,
   savePartagesRecus,
+  setActiveDashboard,
+  loadDashboards,
+  saveDashboards,
+  createDashboardFolder,
 } from './drive.js';
 import {
   createEntry,
@@ -52,6 +56,9 @@ const settingsError = document.getElementById('settings-error');
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
 const modelesSection = document.getElementById('modeles');
+const settingsSection = document.getElementById('settings');
+const partagesSection = document.getElementById('partages');
+const partagesRecusSection = document.getElementById('partages-recus');
 const modeleNewButton = document.getElementById('modele-new-button');
 const modeleFormTitle = document.getElementById('modele-form-title');
 const modeleFormError = document.getElementById('modele-form-error');
@@ -75,6 +82,7 @@ const entryAddFieldButton = document.getElementById('entry-add-field-button');
 const entryTableBody = document.getElementById('entry-table-body');
 const entryError = document.getElementById('entry-error');
 const partageForm = document.getElementById('partage-form');
+const partageDashboardSelect = document.getElementById('partage-dashboard');
 const partageNom = document.getElementById('partage-nom');
 const partageEmail = document.getElementById('partage-email');
 const partageReglesFieldset = document.getElementById('partage-regles');
@@ -100,6 +108,9 @@ const modeleCancel = document.getElementById('modele-cancel');
 const modeleList = document.getElementById('modele-list');
 const modeleListDefaut = document.getElementById('modele-list-defaut');
 const modeleError = document.getElementById('modele-error');
+const sidebarDashboardsError = document.getElementById('sidebar-dashboards-error');
+
+const ACTIVE_DASHBOARD_KEY = 'logbook_active_dashboard_id';
 
 let entries = [];
 let settings = {};
@@ -115,7 +126,16 @@ let activeCalculAuto = null;
 let editingModeleId = null;
 let ownerName = null;
 let currentJournalId = null;
-let modelesViewActive = false;
+// Page affichée dans #main-content : 'entries' | 'modeles' | 'settings' | 'partages' | 'acces'.
+// currentJournalId prime dessus (journal partagé reçu affiché par-dessus, cf renderMainView).
+let mainView = 'entries';
+let dashboards = [];
+let activeDashboardId = 'default';
+// Le formulaire de partage peut cibler un dashboard différent de l'actif (sélecteur
+// dans la section Partage) : ces deux variables suivent ce choix indépendamment de
+// `partages`/`entries` (qui, eux, restent toujours ceux du dashboard actif).
+let partageViewDashboardId = null;
+let partageViewPartages = [];
 
 function buildSharedFileName(nom) {
   return `${(ownerName ?? 'Logbook').trim()} — ${nom.trim()}.json`;
@@ -327,6 +347,7 @@ function startEditPartage(partage) {
   applyPartageRegles(partage.regles);
   partageSubmit.textContent = 'Enregistrer les modifications';
   partageCancel.hidden = false;
+  partageDashboardSelect.disabled = true;
   partageError.textContent = '';
 }
 
@@ -334,6 +355,9 @@ function stopEditPartage() {
   editingPartageId = null;
   partageForm.reset();
   resetPartageRegles();
+  // partage-dashboard fait partie du form : reset() le remettrait au premier <option>.
+  partageDashboardSelect.value = partageViewDashboardId ?? activeDashboardId;
+  partageDashboardSelect.disabled = false;
   partageSubmit.textContent = 'Créer le partage';
   partageCancel.hidden = true;
 }
@@ -471,17 +495,24 @@ async function syncPartages() {
   }
 }
 
+// Si le tableau affiché dans le sélecteur de partage est l'actif, répercute le
+// résultat dans `partages` (utilisé par syncPartages lors de l'édition d'entrées).
+function syncPartageViewIntoActive() {
+  if (partageViewDashboardId === activeDashboardId) partages = partageViewPartages;
+}
+
 async function deletePartage(partage) {
   partageError.textContent = '';
   if (editingPartageId === partage.id) stopEditPartage();
-  const previousPartages = partages;
-  partages = partages.filter((p) => p.id !== partage.id);
+  const previousPartages = partageViewPartages;
+  partageViewPartages = partageViewPartages.filter((p) => p.id !== partage.id);
   renderPartages();
   try {
     await deleteSharedFile(partage.fichierId);
-    await savePartages(partages);
+    await savePartages(partageViewPartages, partageViewDashboardId);
+    syncPartageViewIntoActive();
   } catch (error) {
-    partages = previousPartages;
+    partageViewPartages = previousPartages;
     partageError.textContent = `Échec de la suppression : ${error.message}`;
     renderPartages();
   }
@@ -489,7 +520,7 @@ async function deletePartage(partage) {
 
 function renderPartages() {
   partageList.innerHTML = '';
-  for (const partage of partages) {
+  for (const partage of partageViewPartages) {
     const li = document.createElement('li');
 
     const titre = document.createElement('p');
@@ -546,19 +577,51 @@ function renderPartages() {
   }
 }
 
+function populatePartageDashboardSelect() {
+  partageDashboardSelect.innerHTML = '';
+  for (const dashboard of dashboards) {
+    const option = document.createElement('option');
+    option.value = dashboard.id;
+    option.textContent = dashboard.nom;
+    partageDashboardSelect.appendChild(option);
+  }
+  partageDashboardSelect.value = partageViewDashboardId ?? activeDashboardId;
+}
+
+// Charge les partages du tableau de bord sélectionné dans le formulaire (par défaut
+// le dernier actif), indépendamment de `partages` qui reste toujours celui de l'actif.
+async function loadPartageView(dashboardId) {
+  stopEditPartage();
+  partageViewDashboardId = dashboardId;
+  partageDashboardSelect.value = dashboardId;
+  partageError.textContent = '';
+  renderLoading(partageList);
+  try {
+    partageViewPartages = dashboardId === activeDashboardId ? partages : await loadPartages(dashboardId);
+  } catch (error) {
+    partageViewPartages = [];
+    partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+  }
+  renderPartages();
+}
+
+partageDashboardSelect.addEventListener('change', () => {
+  loadPartageView(partageDashboardSelect.value);
+});
+
 async function retirerPartageRecu(partageRecu) {
   partagesRecusError.textContent = '';
   const previous = partagesRecus;
   partagesRecus = partagesRecus.filter((p) => p.id !== partageRecu.id);
   renderPartagesRecus();
-  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
   try {
     await savePartagesRecus(partagesRecus);
   } catch (error) {
     partagesRecus = previous;
     partagesRecusError.textContent = `Échec du retrait : ${error.message}`;
     renderPartagesRecus();
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
   }
 }
 
@@ -812,23 +875,32 @@ function renderMainView() {
   entriesSection.hidden = true;
   journalPartageSection.hidden = true;
   modelesSection.hidden = true;
+  settingsSection.hidden = true;
+  partagesSection.hidden = true;
+  partagesRecusSection.hidden = true;
 
-  if (modelesViewActive) {
-    modelesSection.hidden = false;
-  } else if (currentJournalId) {
+  if (currentJournalId) {
     journalPartageSection.hidden = false;
     renderJournalPartage(currentJournalId, (updated) => {
       partagesRecus = updated;
       renderPartagesRecus();
-      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+      renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
     });
+  } else if (mainView === 'modeles') {
+    modelesSection.hidden = false;
+  } else if (mainView === 'settings') {
+    settingsSection.hidden = false;
+  } else if (mainView === 'partages') {
+    partagesSection.hidden = false;
+  } else if (mainView === 'acces') {
+    partagesRecusSection.hidden = false;
   } else {
     entriesSection.hidden = false;
   }
 }
 
 function setJournalId(fichierId) {
-  modelesViewActive = false;
+  mainView = 'entries';
   currentJournalId = fichierId;
   const url = new URL(window.location.href);
   if (fichierId) {
@@ -838,7 +910,7 @@ function setJournalId(fichierId) {
   }
   window.history.pushState({ journal: fichierId }, '', url);
   renderMainView();
-  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
   closeModal();
   closeSidebarOnMobile();
 }
@@ -846,19 +918,36 @@ function setJournalId(fichierId) {
 window.addEventListener('popstate', () => {
   currentJournalId = getJournalIdFromUrl();
   renderMainView();
-  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
 });
 
 initSidebar({
   onSelectJournal: setJournalId,
-  onOpenSettings: () => openModal('settings'),
-  onOpenPartages: () => openModal('partages'),
-  onOpenAcces: () => openModal('partages-recus'),
-  onOpenModeles: () => {
-    modelesViewActive = true;
+  onOpenSettings: () => {
+    mainView = 'settings';
     renderMainView();
     closeSidebarOnMobile();
   },
+  onOpenPartages: () => {
+    mainView = 'partages';
+    renderMainView();
+    populatePartageDashboardSelect();
+    loadPartageView(activeDashboardId);
+    closeSidebarOnMobile();
+  },
+  onOpenAcces: () => {
+    mainView = 'acces';
+    renderMainView();
+    closeSidebarOnMobile();
+  },
+  onOpenModeles: () => {
+    mainView = 'modeles';
+    renderMainView();
+    closeSidebarOnMobile();
+  },
+  onSelectDashboard: switchDashboard,
+  onCreateDashboard: createDashboard,
+  onRenameDashboard: renameDashboard,
 });
 
 modeleNewButton.addEventListener('click', () => {
@@ -1022,9 +1111,10 @@ partageForm.addEventListener('submit', async (event) => {
   const email = partageEmail.value.trim();
 
   if (editingPartageId) {
-    const partage = partages.find((p) => p.id === editingPartageId);
+    const partage = partageViewPartages.find((p) => p.id === editingPartageId);
     try {
-      const filtered = filtrerEntreesPartage(entries, regles);
+      const sourceEntries = await loadEntries(partageViewDashboardId);
+      const filtered = filtrerEntreesPartage(sourceEntries, regles);
       await updateSharedFile(partage.fichierId, filtered);
       let fileName = partage.fileName;
       if (nom !== partage.nom) {
@@ -1036,10 +1126,11 @@ partageForm.addEventListener('submit', async (event) => {
         if (permissionId) await revokePermission(partage.fichierId, permissionId);
         permissionId = await shareFileWithEmail(partage.fichierId, email);
       }
-      partages = partages.map((p) =>
+      partageViewPartages = partageViewPartages.map((p) =>
         p.id === editingPartageId ? { ...p, nom, regles, emails: [email], fileName, permissionId } : p,
       );
-      await savePartages(partages);
+      await savePartages(partageViewPartages, partageViewDashboardId);
+      syncPartageViewIntoActive();
       renderPartages();
       stopEditPartage();
     } catch (error) {
@@ -1050,11 +1141,12 @@ partageForm.addEventListener('submit', async (event) => {
 
   try {
     const fileName = buildSharedFileName(nom);
-    const filtered = filtrerEntreesPartage(entries, regles);
-    const fichierId = await createSharedFile(fileName, filtered);
+    const sourceEntries = await loadEntries(partageViewDashboardId);
+    const filtered = filtrerEntreesPartage(sourceEntries, regles);
+    const fichierId = await createSharedFile(fileName, filtered, partageViewDashboardId);
     const permissionId = await shareFileWithEmail(fichierId, email);
-    partages = [
-      ...partages,
+    partageViewPartages = [
+      ...partageViewPartages,
       {
         id: crypto.randomUUID(),
         nom,
@@ -1066,10 +1158,13 @@ partageForm.addEventListener('submit', async (event) => {
         creeLe: new Date().toISOString(),
       },
     ];
-    await savePartages(partages);
+    await savePartages(partageViewPartages, partageViewDashboardId);
+    syncPartageViewIntoActive();
     renderPartages();
     partageForm.reset();
     resetPartageRegles();
+    // partage-dashboard fait partie du form : reset() le remettrait au premier <option>.
+    partageDashboardSelect.value = partageViewDashboardId;
   } catch (error) {
     partageError.textContent = `Échec de la création du partage : ${error.message}`;
   }
@@ -1092,6 +1187,155 @@ function renderTableLoading(tbody, colspan) {
   tbody.appendChild(row);
 }
 
+// Charge entries/settings/partages/partagesRecus/modeles pour le dashboard actif
+// (déjà sélectionné via setActiveDashboard) et réaffiche les vues correspondantes.
+// Partagée entre la connexion initiale et la bascule de dashboard.
+async function loadAccountData() {
+  entryError.textContent = '';
+  settingsError.textContent = '';
+  partageError.textContent = '';
+  partagesRecusError.textContent = '';
+  modeleError.textContent = '';
+  renderTableLoading(entryTableBody, 6);
+  renderLoading(partageList);
+  renderLoading(partagesRecusList);
+  renderLoading(modeleList);
+
+  try {
+    settings = await loadSettings();
+  } catch (error) {
+    settings = {};
+    settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+  }
+  themeSelect.value = settings.theme ?? DEFAULT_THEME;
+  applyTheme(settings.theme ?? DEFAULT_THEME);
+
+  try {
+    entries = (await loadEntries()).map(migrateEntryContenu);
+  } catch (error) {
+    entries = [];
+    entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
+  }
+  renderEntries();
+
+  try {
+    partages = await loadPartages();
+  } catch (error) {
+    partages = [];
+    partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+  }
+  partageViewDashboardId = activeDashboardId;
+  partageViewPartages = partages;
+  try {
+    ownerName = await getOwnerDisplayName();
+  } catch {
+    ownerName = null;
+  }
+  renderPartages();
+
+  try {
+    partagesRecus = await loadPartagesRecus();
+  } catch (error) {
+    partagesRecus = [];
+    partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
+  }
+  renderPartagesRecus();
+
+  try {
+    modeles = (await loadModeles()).map(migrateModeleContenu);
+  } catch (error) {
+    modeles = [];
+    modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
+  }
+  renderModeles();
+  renderEntryNewMenu();
+}
+
+let dashboardSwitchInProgress = false;
+
+async function switchDashboard(dashboardId) {
+  // Ignore tout clic pendant qu'un chargement de dashboard est en cours : sinon deux
+  // appels se chevauchent et se marchent dessus sur activeDashboardId/folderIdCache
+  // (partagés côté drive.js), et on finit par charger les données du mauvais dossier.
+  if (dashboardId === activeDashboardId) {
+    // "Mes entrées" a été retiré de la sidebar : cliquer sur le dashboard déjà actif
+    // est maintenant le seul moyen de revenir à ses entrées depuis une autre page
+    // (Partage/Modèles/Paramètres/Accès) ou depuis un journal partagé reçu.
+    if (currentJournalId !== null || mainView !== 'entries') setJournalId(null);
+    return;
+  }
+  if (dashboardSwitchInProgress) return;
+  dashboardSwitchInProgress = true;
+  try {
+    await switchDashboardUnguarded(dashboardId);
+  } finally {
+    dashboardSwitchInProgress = false;
+  }
+}
+
+async function switchDashboardUnguarded(dashboardId) {
+  sidebarDashboardsError.textContent = '';
+  stopEditEntry();
+  stopEditModele();
+  stopEditPartage();
+  closeModal();
+  // Un dashboard n'affiche que ses entrées : on quitte toute autre page/journal en cours.
+  mainView = 'entries';
+  if (currentJournalId !== null) {
+    currentJournalId = null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('journal');
+    window.history.pushState({ journal: null }, '', url);
+  }
+  activeDashboardId = dashboardId;
+  localStorage.setItem(ACTIVE_DASHBOARD_KEY, dashboardId);
+  setActiveDashboard(dashboardId);
+  // Surligner le dashboard sélectionné tout de suite plutôt qu'après le chargement
+  // réseau : sinon la sidebar semble figée pendant les quelques appels Drive séquentiels.
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  await loadAccountData();
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  renderMainView();
+  closeSidebarOnMobile();
+}
+
+async function createDashboard() {
+  if (dashboardSwitchInProgress) return;
+  const nom = window.prompt('Nom du nouveau tableau de bord :');
+  if (!nom || !nom.trim()) return;
+  sidebarDashboardsError.textContent = '';
+  const id = crypto.randomUUID();
+  const dossierNom = `logbook-${id}`;
+  const previousDashboards = dashboards;
+  try {
+    const dossierId = await createDashboardFolder(dossierNom);
+    dashboards = [...dashboards, { id, nom: nom.trim(), dossierNom, dossierId, creeLe: new Date().toISOString() }];
+    await saveDashboards(dashboards);
+    await switchDashboard(id);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de la création du tableau de bord : ${error.message}`;
+  }
+}
+
+async function renameDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  const nom = window.prompt('Nouveau nom du tableau de bord :', dashboard.nom);
+  if (!nom || !nom.trim() || nom.trim() === dashboard.nom) return;
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  dashboards = dashboards.map((d) => (d.id === dashboardId ? { ...d, nom: nom.trim() } : d));
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  try {
+    await saveDashboards(dashboards);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec du renommage : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   authSection.hidden = connected;
@@ -1102,62 +1346,38 @@ onAuthChange(async (token) => {
   partageError.textContent = '';
   partagesRecusError.textContent = '';
   modeleError.textContent = '';
+  sidebarDashboardsError.textContent = '';
 
   if (connected) {
     currentJournalId = getJournalIdFromUrl();
+    mainView = 'entries';
+
+    // Feedback immédiat : sans ça, sidebar et contenu restent figés/vides pendant les
+    // premiers appels Drive (chargement du registre de dashboards), avant même que
+    // loadAccountData démarre — ça donnait une impression de chargement incohérent.
+    renderMainView();
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
     renderTableLoading(entryTableBody, 6);
     renderLoading(partageList);
     renderLoading(partagesRecusList);
     renderLoading(modeleList);
 
     try {
-      settings = await loadSettings();
+      dashboards = await loadDashboards();
     } catch (error) {
-      settings = {};
-      settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+      dashboards = [{ id: 'default', nom: 'Mon journal de bord', dossierNom: 'logbook', creeLe: new Date().toISOString() }];
+      sidebarDashboardsError.textContent = `Échec du chargement des tableaux de bord : ${error.message}`;
     }
-    themeSelect.value = settings.theme ?? DEFAULT_THEME;
-    applyTheme(settings.theme ?? DEFAULT_THEME);
+    const storedDashboardId = localStorage.getItem(ACTIVE_DASHBOARD_KEY);
+    activeDashboardId = dashboards.some((d) => d.id === storedDashboardId) ? storedDashboardId : 'default';
+    setActiveDashboard(activeDashboardId);
+    // Dashboards connus tout de suite : la liste/bouton "créer" s'affichent sans attendre
+    // le reste (entrées/partages/modèles), qui arrive progressivement via loadAccountData.
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
 
-    try {
-      entries = (await loadEntries()).map(migrateEntryContenu);
-    } catch (error) {
-      entries = [];
-      entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
-    }
-    renderEntries();
+    await loadAccountData();
 
-    try {
-      partages = await loadPartages();
-    } catch (error) {
-      partages = [];
-      partageError.textContent = `Échec du chargement des partages : ${error.message}`;
-    }
-    try {
-      ownerName = await getOwnerDisplayName();
-    } catch {
-      ownerName = null;
-    }
-    renderPartages();
-
-    try {
-      partagesRecus = await loadPartagesRecus();
-    } catch (error) {
-      partagesRecus = [];
-      partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
-    }
-    renderPartagesRecus();
-
-    try {
-      modeles = (await loadModeles()).map(migrateModeleContenu);
-    } catch (error) {
-      modeles = [];
-      modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
-    }
-    renderModeles();
-    renderEntryNewMenu();
-
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId });
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
     renderMainView();
   } else {
     entries = [];
@@ -1165,9 +1385,11 @@ onAuthChange(async (token) => {
     partages = [];
     partagesRecus = [];
     modeles = [];
+    dashboards = [];
+    activeDashboardId = 'default';
     ownerName = null;
     currentJournalId = null;
-    modelesViewActive = false;
+    mainView = 'entries';
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
     renderEntries();
