@@ -1,0 +1,52 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  - title: '🚀 Fonctionnalités'
+    labels: ['feat']
+  - title: '🐛 Corrections'
+    labels: ['fix', 'hotfix']
+  - title: '🔧 Maintenance'
+    labels: ['chore', 'refactor', 'style']
+  - title: '⚡ Performance'
+    labels: ['perf']
+  - title: '📝 Documentation'
+    labels: ['docs']
+  - title: '✅ Tests'
+    labels: ['test']
+
+change-template: '- $TITLE (#$NUMBER)'
+change-title-escapes: '\<*_&'
+exclude-labels: ['skip-changelog']
+
+autolabeler:
+  - label: 'feat'
+    title: '/^feat(\(.+\))?:/'
+  - label: 'fix'
+    title: '/^fix(\(.+\))?:/'
+  - label: 'hotfix'
+    branch: '/^hotfix(-release)?\//'
+  - label: 'refactor'
+    title: '/^refactor(\(.+\))?:/'
+  - label: 'docs'
+    title: '/^docs(\(.+\))?:/'
+  - label: 'test'
+    title: '/^test(\(.+\))?:/'
+  - label: 'chore'
+    title: '/^chore(\(.+\))?:/'
+  - label: 'style'
+    title: '/^style(\(.+\))?:/'
+  - label: 'perf'
+    title: '/^perf(\(.+\))?:/'
+
+version-resolver:
+  minor:
+    labels: ['feat']
+  patch:
+    labels: ['fix', 'hotfix', 'chore', 'refactor', 'docs', 'test', 'style', 'perf']
+  default: patch
+
+template: |
+  ## Changements
+
+  $CHANGES

@@ -7,6 +7,7 @@ const sidebarOwnerName = document.getElementById('sidebar-owner-name');
 const sidebarProfileButton = document.getElementById('sidebar-profile-button');
 const sidebarProfileMenu = document.getElementById('sidebar-profile-menu');
 const sidebarSettingsButton = document.getElementById('sidebar-settings-button');
+const sidebarDashboards = document.getElementById('sidebar-dashboards');
 const sidebarJournaux = document.getElementById('sidebar-journaux');
 const sidebarJournauxPlus = document.getElementById('sidebar-journaux-plus');
 const sidebarPartageButton = document.getElementById('sidebar-partage-button');
@@ -63,7 +64,16 @@ export function closeSidebarOnMobile() {
   }
 }
 
-export function initSidebar({ onSelectJournal, onOpenSettings, onOpenPartages, onOpenAcces, onOpenModeles }) {
+export function initSidebar({
+  onSelectJournal,
+  onOpenSettings,
+  onOpenPartages,
+  onOpenAcces,
+  onOpenModeles,
+  onSelectDashboard,
+  onCreateDashboard,
+  onRenameDashboard,
+}) {
   sidebarSettingsButton.addEventListener('click', onOpenSettings);
   sidebarPartageButton.addEventListener('click', onOpenPartages);
   sidebarModelesButton.addEventListener('click', onOpenModeles);
@@ -72,6 +82,19 @@ export function initSidebar({ onSelectJournal, onOpenSettings, onOpenPartages, o
     const button = event.target.closest('button');
     if (!button) return;
     onSelectJournal(button.dataset.journalId || null);
+  });
+  sidebarDashboards.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    if (button.dataset.action === 'create') {
+      onCreateDashboard();
+      return;
+    }
+    if (button.dataset.dashboardId) onSelectDashboard(button.dataset.dashboardId);
+  });
+  sidebarDashboards.addEventListener('dblclick', (event) => {
+    const button = event.target.closest('button[data-dashboard-id]');
+    if (button) onRenameDashboard(button.dataset.dashboardId);
   });
 }
 
@@ -83,21 +106,33 @@ function avatarColorClass(name) {
   return `avatar-color-${Math.abs(hash) % AVATAR_COLOR_COUNT}`;
 }
 
-export function renderSidebar({ ownerName, partagesRecus, activeJournalId }) {
+export function renderSidebar({ ownerName, partagesRecus, activeJournalId, dashboards, activeDashboardId }) {
   const name = ownerName ?? 'Logbook';
   sidebarOwnerName.textContent = name;
   sidebarOwnerAvatar.textContent = name.trim().charAt(0).toUpperCase();
   sidebarOwnerAvatar.className = avatarColorClass(name);
 
-  sidebarJournaux.innerHTML = '';
+  sidebarDashboards.innerHTML = '';
+  for (const dashboard of dashboards ?? []) {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = dashboard.nom;
+    button.dataset.dashboardId = dashboard.id;
+    button.title = 'Double-clic pour renommer';
+    button.setAttribute('aria-current', dashboard.id === activeDashboardId ? 'true' : 'false');
+    li.appendChild(button);
+    sidebarDashboards.appendChild(li);
+  }
+  const createLi = document.createElement('li');
+  const createButton = document.createElement('button');
+  createButton.type = 'button';
+  createButton.dataset.action = 'create';
+  createButton.textContent = '+ Nouveau tableau de bord';
+  createLi.appendChild(createButton);
+  sidebarDashboards.appendChild(createLi);
 
-  const monJournalLi = document.createElement('li');
-  const monJournalButton = document.createElement('button');
-  monJournalButton.type = 'button';
-  monJournalButton.textContent = 'Mon journal de bord';
-  monJournalButton.setAttribute('aria-current', activeJournalId ? 'false' : 'true');
-  monJournalLi.appendChild(monJournalButton);
-  sidebarJournaux.appendChild(monJournalLi);
+  sidebarJournaux.innerHTML = '';
 
   const recents = [...partagesRecus]
     .sort((a, b) => new Date(b.dernierAccesLe ?? b.premierAccesLe) - new Date(a.dernierAccesLe ?? a.premierAccesLe))

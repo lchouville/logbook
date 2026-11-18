@@ -1,0 +1,49 @@
+name: Merge Release Notes
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  update-release-notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Append release notes
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+          BODY: ${{ github.event.release.body }}
+        run: |
+          if [ -f release-notes.md ] && grep -qF "## $VERSION" release-notes.md; then
+            echo "skip=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          DATE=$(date -u +%Y-%m-%d)
+          [ -f release-notes.md ] || printf '# Release notes\n' > release-notes.md
+          {
+            echo ""
+            echo "## $VERSION - $DATE"
+            echo ""
+            echo "$BODY"
+          } >> release-notes.md
+          echo "skip=false" >> "$GITHUB_ENV"
+
+      - name: Create pull request
+        if: env.skip == 'false'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/release-notes-${{ github.event.release.tag_name }}
+          base: develop
+          title: "docs: add release notes for ${{ github.event.release.tag_name }}"
+          commit-message: "docs: add release notes for ${{ github.event.release.tag_name }}"
+          body: Ajout automatique des notes de version `${{ github.event.release.tag_name }}` dans `release-notes.md`.
+          add-paths: release-notes.md
