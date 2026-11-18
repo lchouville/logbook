@@ -29,6 +29,8 @@
           <button id="sign-out" type="button">Se déconnecter</button>
         </div>
       </div>
+      <ul id="sidebar-dashboards"></ul>
+      <p id="sidebar-dashboards-error" role="alert"></p>
       <ul id="sidebar-journaux"></ul>
       <button id="sidebar-journaux-plus" type="button" hidden>Voir tout</button>
       <button id="sidebar-partage-button" type="button">Partage</button>
@@ -60,6 +62,18 @@
             <tbody id="entry-table-body"></tbody>
           </table>
         </div>
+      </section>
+
+      <section id="modeles" hidden>
+        <div id="modeles-header">
+          <h2>Modèles</h2>
+          <button id="modele-new-button" type="button">+ Nouveau modèle</button>
+        </div>
+        <p id="modele-error" role="alert"></p>
+        <h3>Modèles par défaut</h3>
+        <ul id="modele-list-defaut" class="card-list"></ul>
+        <h3>Mes modèles</h3>
+        <ul id="modele-list" class="card-list"></ul>
       </section>
 
       <div id="schema-field-popover" hidden>
@@ -99,8 +113,6 @@
                 <th>Thème(s)</th>
                 <th>Niveau</th>
                 <th>Statut</th>
-                <th>Énergie</th>
-                <th>Ressenti</th>
                 <th>Texte</th>
                 <th>Ressenti à froid</th>
               </tr>
@@ -108,6 +120,63 @@
             <tbody id="viewer-table-body"></tbody>
           </table>
         </div>
+      </section>
+
+      <section id="settings" hidden>
+        <h2>Paramètres</h2>
+        <label for="theme-select">Thème</label>
+        <select id="theme-select">
+          <option value="device">Appareil</option>
+          <option value="light">Clair</option>
+          <option value="dark">Sombre</option>
+        </select>
+
+        <label for="session-duration-select">Rester connecté</label>
+        <select id="session-duration-select">
+          <option value="1h">1 heure</option>
+          <option value="5h">5 heures</option>
+          <option value="1j">1 jour</option>
+          <option value="7j">7 jours</option>
+          <option value="30j">30 jours</option>
+          <option value="4mois">4 mois</option>
+          <option value="8mois">8 mois</option>
+          <option value="1an">1 an</option>
+          <option value="jamais">Jamais (illimité)</option>
+        </select>
+        <p class="field-hint">Au-delà de cette durée depuis ta dernière connexion, l'app te redemandera de te reconnecter explicitement — propre à ce navigateur, pas synchronisé.</p>
+
+        <p id="settings-error" role="alert"></p>
+        <p><a href="confidentialite.html">Politique de confidentialité</a></p>
+        <p id="app-version" class="field-hint"></p>
+      </section>
+
+      <section id="partages" hidden>
+        <h2>Partages</h2>
+        <form id="partage-form">
+          <label for="partage-dashboard">Tableau de bord à partager</label>
+          <select id="partage-dashboard"></select>
+
+          <label for="partage-nom">Nom</label>
+          <input id="partage-nom" type="text" required>
+
+          <label for="partage-email">Email Google de la personne invitée</label>
+          <input id="partage-email" type="email" required>
+
+          <fieldset id="partage-regles">
+            <legend>Visible par thème et niveau</legend>
+          </fieldset>
+
+          <button id="partage-submit" type="submit">Créer le partage</button>
+          <button id="partage-cancel" type="button" hidden>Annuler</button>
+        </form>
+        <p id="partage-error" role="alert"></p>
+        <ul id="partage-list" class="card-list"></ul>
+      </section>
+
+      <section id="partages-recus" hidden>
+        <h2>Accès</h2>
+        <p id="partages-recus-error" role="alert"></p>
+        <ul id="partages-recus-list" class="card-list"></ul>
       </section>
     </main>
   </div>
@@ -124,8 +193,8 @@
 
           <div id="entry-properties">
             <div class="entry-property-row">
-              <span class="entry-property-label">Date</span>
-              <span id="entry-date-display" class="entry-property-value"></span>
+              <label for="entry-date" class="entry-property-label">Date</label>
+              <input id="entry-date" type="date" class="entry-property-value" required>
             </div>
           </div>
 
@@ -150,76 +219,35 @@
                   <option value="" disabled selected>Choisir…</option>
                 </select>
               </li>
-              <li class="entry-block-row" draggable="true" data-order-key="typeJournee">
-                <span class="drag-handle" aria-hidden="true">⠿</span>
-                <label for="entry-type-journee">Type de journée</label>
-                <select id="entry-type-journee" required>
-                  <option value="" disabled selected>Choisir…</option>
-                </select>
-              </li>
-              <li class="entry-block-row" draggable="true" data-order-key="energie">
-                <span class="drag-handle" aria-hidden="true">⠿</span>
-                <label for="entry-energie">Énergie (0-10)</label>
-                <input id="entry-energie" type="number" min="0" max="10" step="0.5">
-              </li>
-              <li class="entry-block-row" draggable="true" data-order-key="ressenti">
-                <span class="drag-handle" aria-hidden="true">⠿</span>
-                <label for="entry-ressenti">Ressenti (0-10)</label>
-                <input id="entry-ressenti" type="number" min="0" max="10" step="0.5">
-              </li>
             </ul>
             <button id="entry-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
           </div>
 
           <div id="entry-ressenti-froid-slot" class="entry-property-row" hidden></div>
 
-          <label for="entry-texte">Texte</label>
-          <textarea id="entry-texte" rows="8"></textarea>
+          <div id="entry-contenu-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Contenu</h3>
+            <div id="entry-contenu-list" class="contenu-list"></div>
+            <div class="contenu-add-buttons">
+              <button id="entry-contenu-add-texte" type="button">+ Bloc texte</button>
+              <button id="entry-contenu-add-tableau" type="button">+ Bloc tableau</button>
+            </div>
+          </div>
 
           <button id="entry-submit" type="submit">Enregistrer</button>
+          <button id="entry-delete" type="button" hidden>Supprimer l'entrée</button>
         </form>
         <p id="entry-error" role="alert"></p>
       </section>
-      <section id="settings" hidden>
-        <h2>Paramètres</h2>
-        <label for="theme-select">Thème</label>
-        <select id="theme-select">
-          <option value="device">Appareil</option>
-          <option value="light">Clair</option>
-          <option value="dark">Sombre</option>
-        </select>
-        <p id="settings-error" role="alert"></p>
-        <p><a href="confidentialite.html">Politique de confidentialité</a></p>
-      </section>
-      <section id="partages" hidden>
-        <h2>Partages</h2>
-        <form id="partage-form">
-          <label for="partage-nom">Nom</label>
-          <input id="partage-nom" type="text" required>
-
-          <label for="partage-email">Email Google de la personne invitée</label>
-          <input id="partage-email" type="email" required>
-
-          <fieldset id="partage-regles">
-            <legend>Visible par thème et niveau</legend>
-          </fieldset>
-
-          <button id="partage-submit" type="submit">Créer le partage</button>
-          <button id="partage-cancel" type="button" hidden>Annuler</button>
-        </form>
-        <p id="partage-error" role="alert"></p>
-        <ul id="partage-list" class="card-list"></ul>
-      </section>
-      <section id="partages-recus" hidden>
-        <h2>Accès</h2>
-        <p id="partages-recus-error" role="alert"></p>
-        <ul id="partages-recus-list" class="card-list"></ul>
-      </section>
-      <section id="modeles" hidden>
-        <h2>Modèles</h2>
+      <section id="modele-form-modal" hidden>
+        <h2 id="modele-form-title">Nouveau modèle</h2>
         <form id="modele-form">
           <label for="modele-nom">Nom</label>
           <input id="modele-nom" type="text" required>
+
+          <label for="modele-titre-pattern">Titre d'entrée (pré-rempli à la création)</label>
+          <input id="modele-titre-pattern" type="text" placeholder="ex : Rituel du soir du {date} #{id}">
+          <p class="field-hint">{date} = date du jour, {id} = numéro de l'entrée pour ce modèle</p>
 
           <div id="modele-fixed-fields">
             <div class="entry-property-row">
@@ -238,20 +266,6 @@
                 <option value="">—</option>
               </select>
             </div>
-            <div class="entry-property-row">
-              <label for="modele-type-journee">Type de journée</label>
-              <select id="modele-type-journee">
-                <option value="">—</option>
-              </select>
-            </div>
-            <div class="entry-property-row">
-              <label for="modele-energie">Énergie (0-10)</label>
-              <input id="modele-energie" type="number" min="0" max="10" step="0.5">
-            </div>
-            <div class="entry-property-row">
-              <label for="modele-ressenti">Ressenti (0-10)</label>
-              <input id="modele-ressenti" type="number" min="0" max="10" step="0.5">
-            </div>
           </div>
 
           <div id="modele-blocks-section" class="fields-editor-section">
@@ -259,14 +273,26 @@
             <button id="modele-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
           </div>
 
-          <label for="modele-texte">Texte</label>
-          <textarea id="modele-texte" rows="6"></textarea>
+          <div id="modele-contenu-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Contenu</h3>
+            <div id="modele-contenu-list" class="contenu-list"></div>
+            <div class="contenu-add-buttons">
+              <button id="modele-contenu-add-texte" type="button">+ Bloc texte</button>
+              <button id="modele-contenu-add-tableau" type="button">+ Bloc tableau</button>
+            </div>
+          </div>
+
+          <div id="modele-bilans-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Bilans</h3>
+            <p class="field-hint">Un bilan agrège automatiquement les entrées créées via ce modèle (il lui faut un bloc tableau de mesures) sur une semaine ou un mois.</p>
+            <ul id="modele-bilans-list"></ul>
+            <button id="modele-bilan-add-button" type="button" class="fields-editor-add-button">+ Ajouter un bilan</button>
+          </div>
 
           <button id="modele-submit" type="submit">Créer le modèle</button>
           <button id="modele-cancel" type="button" hidden>Annuler</button>
         </form>
-        <p id="modele-error" role="alert"></p>
-        <ul id="modele-list" class="card-list"></ul>
+        <p id="modele-form-error" role="alert"></p>
       </section>
     </div>
   </div>
