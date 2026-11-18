@@ -147,6 +147,7 @@
 
         <p id="settings-error" role="alert"></p>
         <p><a href="confidentialite.html">Politique de confidentialité</a></p>
+        <p id="app-version" class="field-hint"></p>
       </section>
 
       <section id="partages" hidden>
@@ -279,6 +280,13 @@
               <button id="modele-contenu-add-texte" type="button">+ Bloc texte</button>
               <button id="modele-contenu-add-tableau" type="button">+ Bloc tableau</button>
             </div>
+          </div>
+
+          <div id="modele-bilans-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Bilans</h3>
+            <p class="field-hint">Un bilan agrège automatiquement les entrées créées via ce modèle (il lui faut un bloc tableau de mesures) sur une semaine ou un mois.</p>
+            <ul id="modele-bilans-list"></ul>
+            <button id="modele-bilan-add-button" type="button" class="fields-editor-add-button">+ Ajouter un bilan</button>
           </div>
 
           <button id="modele-submit" type="submit">Créer le modèle</button>

@@ -554,6 +554,33 @@ form button[type="submit"] {
   background: var(--color-bg-hover);
 }
 
+#entry-new-menu button.entry-new-menu-bilan {
+  padding-left: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--color-fg-secondary);
+}
+
+.modele-bilan-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.375rem;
+}
+
+.modele-bilan-row input[type='text'] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Sans ça, la règle globale `select { width: 100% }` donne à ce select une
+   base flex énorme (100% du conteneur) : au moment de rétrécir pour tenir sur
+   la ligne, les deux inputs flex:1 (base 0) n'absorbent aucune part du
+   rétrécissement et se retrouvent écrasés à leur taille minimale. */
+.modele-bilan-row select {
+  flex: 0 0 auto;
+  width: auto;
+}
+
 .table-wrapper {
   overflow-x: auto;
 }
@@ -790,6 +817,10 @@ form button[type="submit"] {
   width: 100%;
 }
 
+.contenu-tableau-scroll {
+  overflow-x: auto;
+}
+
 .contenu-tableau {
   width: 100%;
   border-collapse: collapse;
@@ -805,10 +836,31 @@ form button[type="submit"] {
   text-align: left;
   font-weight: 600;
   font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+/* Colonne des noms de mesure figée pendant le défilement horizontal, pour
+   garder le repère de ligne visible même tout à droite d'un tableau large
+   (ex. 31 colonnes pour un bilan mensuel). */
+.contenu-tableau th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--color-bg);
+  z-index: 1;
 }
 
 .contenu-tableau input {
   margin: 0;
+}
+
+/* Uniquement les cellules de données (pas les noms de ligne/colonne en th,
+   qui doivent rester lisibles en entier, ex. "Ressenti Masculin") : empêche
+   le navigateur de les tasser sous leur largeur de contenu quand il y a
+   beaucoup de colonnes (ex. 31 pour un bilan mensuel), sans quoi les
+   chiffres se chevauchent et deviennent illisibles. */
+.contenu-tableau td input {
+  width: 2.75rem;
+  box-sizing: border-box;
 }
 
 .contenu-cell-delete {

@@ -46,26 +46,14 @@ const MESURES_RITUEL_NUMERIQUES = [
   "Envie d'entamer une transition",
 ];
 
-// Construit le Contenu (tableau + graphique) d'un bilan hebdomadaire à partir
-// des entrées « Rituel du soir » de la semaine calendaire (lundi à dimanche)
-// contenant `finDateIso`. Les 7 jours sont toujours affichés (tableau et
-// graphique), même si certains n'ont pas d'entrée — ces valeurs manquantes
-// sont simplement sautées, pas interpolées. Les noms de mesures viennent du
-// tableau de mesures de l'entrée la plus récente trouvée dans la semaine,
-// pour rester cohérent même si l'utilisateur les a renommées dans son propre
-// modèle.
-export function buildBilanRituelDuSoir(entriesRituel, finDateIso) {
-  const fin = new Date(finDateIso);
-  const jourSemaineLundi1 = fin.getDay() === 0 ? 7 : fin.getDay(); // 1=lundi … 7=dimanche
-  const lundi = new Date(fin);
-  lundi.setDate(lundi.getDate() - (jourSemaineLundi1 - 1));
-  const jours = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(lundi);
-    d.setDate(d.getDate() + i);
-    jours.push(d.toISOString().slice(0, 10));
-  }
-
+// Construit le Contenu (tableau + graphique) d'un bilan à partir des entrées
+// « Rituel du soir » couvrant `jours` (liste de dates ISO). Les jours sont
+// toujours tous affichés (tableau et graphique), même sans entrée — ces
+// valeurs manquantes sont simplement sautées, pas interpolées. Les noms de
+// mesures viennent du tableau de mesures de l'entrée la plus récente trouvée
+// dans la période, pour rester cohérent même si l'utilisateur les a
+// renommées dans son propre modèle.
+function buildBilanRituel(entriesRituel, jours, titreTableau, titreGraphique) {
   const parDate = new Map(entriesRituel.map((e) => [e.date, e]));
 
   function tableauInfo(entry) {
@@ -87,7 +75,7 @@ export function buildBilanRituelDuSoir(entriesRituel, finDateIso) {
   const tableauBlock = {
     id: crypto.randomUUID(),
     type: 'tableau',
-    titre: 'Tableau de la semaine',
+    titre: titreTableau,
     colonnes: jours.map((j) => ({ id: crypto.randomUUID(), nom: formatDateFrCourt(j) })),
     lignes: lignesNoms.map((nom) => ({ id: crypto.randomUUID(), nom })),
   };
@@ -99,7 +87,7 @@ export function buildBilanRituelDuSoir(entriesRituel, finDateIso) {
     });
   });
 
-  const graphiqueBlock = { id: crypto.randomUUID(), type: 'graphique', titre: 'Évolution sur la semaine' };
+  const graphiqueBlock = { id: crypto.randomUUID(), type: 'graphique', titre: titreGraphique };
   const series = lignesNoms
     .filter((nom) => MESURES_RITUEL_NUMERIQUES.includes(nom))
     .map((nom) => ({
@@ -115,6 +103,40 @@ export function buildBilanRituelDuSoir(entriesRituel, finDateIso) {
     contenuSchema: { blocks: [tableauBlock, graphiqueBlock], order: [tableauBlock.id, graphiqueBlock.id] },
     contenuValeurs: { [tableauBlock.id]: tableauValeurs, [graphiqueBlock.id]: { series } },
   };
+}
+
+// Bilan hebdomadaire : semaine calendaire (lundi à dimanche) contenant `finDateIso`.
+export function buildBilanRituelDuSoir(entriesRituel, finDateIso) {
+  const fin = new Date(finDateIso);
+  const jourSemaineLundi1 = fin.getDay() === 0 ? 7 : fin.getDay(); // 1=lundi … 7=dimanche
+  const lundi = new Date(fin);
+  lundi.setDate(lundi.getDate() - (jourSemaineLundi1 - 1));
+  const jours = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(lundi);
+    d.setDate(d.getDate() + i);
+    jours.push(d.toISOString().slice(0, 10));
+  }
+  return buildBilanRituel(entriesRituel, jours, 'Tableau de la semaine', 'Évolution sur la semaine');
+}
+
+// Bilan mensuel : tous les jours du mois calendaire contenant `finDateIso`.
+export function buildBilanMensuelRituelDuSoir(entriesRituel, finDateIso) {
+  const fin = new Date(finDateIso);
+  // setDate(1) sur une copie de `fin` (pas un nouveau Date(Y,M,1)) : préserve l'heure
+  // locale de `fin`, qui compense déjà le décalage UTC introduit par le parsing de
+  // finDateIso — reconstruire à minuit local casserait cette compensation et décale
+  // chaque jour d'un cran une fois repassé par toISOString() plus bas.
+  const premierJour = new Date(fin);
+  premierJour.setDate(1);
+  const nbJours = new Date(fin.getFullYear(), fin.getMonth() + 1, 0).getDate();
+  const jours = [];
+  for (let i = 0; i < nbJours; i++) {
+    const d = new Date(premierJour);
+    d.setDate(d.getDate() + i);
+    jours.push(d.toISOString().slice(0, 10));
+  }
+  return buildBilanRituel(entriesRituel, jours, 'Tableau du mois', 'Évolution sur le mois');
 }
 
 export function blankContenuSchema() {
