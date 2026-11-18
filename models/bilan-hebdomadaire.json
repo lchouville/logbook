@@ -1,0 +1,13 @@
+{
+  "nom": "Bilan hebdomadaire",
+  "themes": [],
+  "niveauAcces": "",
+  "statut": "Bilan",
+  "champsPersonnalises": {},
+  "champsSchema": { "fields": [], "order": [] },
+  "contenuSchema": {
+    "blocks": [{ "id": "texte", "type": "texte", "titre": "Texte" }],
+    "order": ["texte"]
+  },
+  "contenuValeursParDefaut": {}
+}

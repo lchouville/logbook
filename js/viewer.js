@@ -7,6 +7,7 @@ import {
   createPartageRecuShortcut,
 } from './drive.js';
 import { pickSharedFile } from './picker.js';
+import { migrateEntryContenu, previewContenuTexte } from './entries.js';
 
 const viewerGrantAccess = document.getElementById('viewer-grant-access');
 const viewerError = document.getElementById('viewer-error');
@@ -26,7 +27,7 @@ function renderViewerLoading() {
   viewerTableBody.innerHTML = '';
   const row = document.createElement('tr');
   const td = document.createElement('td');
-  td.colSpan = 9;
+  td.colSpan = 7;
   td.textContent = 'Chargement…';
   row.appendChild(td);
   viewerTableBody.appendChild(row);
@@ -42,9 +43,7 @@ function renderViewerEntries(entries) {
     appendCell(row, entry.themes.join(', '));
     appendCell(row, entry.niveauAcces);
     appendCell(row, entry.statut);
-    appendCell(row, entry.mesuresSoir?.energie ?? '—');
-    appendCell(row, entry.mesuresSoir?.ressenti ?? '—');
-    appendCell(row, entry.texte ?? '');
+    appendCell(row, previewContenuTexte(entry));
     appendCell(row, entry.ressentiAFroid != null ? `${entry.ressentiAFroid}/10` : '—');
 
     viewerTableBody.appendChild(row);
@@ -87,7 +86,7 @@ export async function renderJournalPartage(fileId, onPartagesRecusChanged) {
   renderViewerLoading();
 
   try {
-    const entries = await loadSharedFile(fileId);
+    const entries = (await loadSharedFile(fileId)).map(migrateEntryContenu);
     viewerGrantAccess.hidden = true;
     renderViewerEntries(entries);
     await recordPartageRecu(fileId, onPartagesRecusChanged);
