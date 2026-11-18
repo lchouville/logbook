@@ -98,9 +98,19 @@ export function initSidebar({
   });
 }
 
+const AVATAR_COLOR_COUNT = 6;
+
+function avatarColorClass(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return `avatar-color-${Math.abs(hash) % AVATAR_COLOR_COUNT}`;
+}
+
 export function renderSidebar({ ownerName, partagesRecus, activeJournalId, dashboards, activeDashboardId }) {
-  sidebarOwnerName.textContent = ownerName ?? 'Logbook';
-  sidebarOwnerAvatar.textContent = (ownerName ?? 'L').trim().charAt(0).toUpperCase();
+  const name = ownerName ?? 'Logbook';
+  sidebarOwnerName.textContent = name;
+  sidebarOwnerAvatar.textContent = name.trim().charAt(0).toUpperCase();
+  sidebarOwnerAvatar.className = avatarColorClass(name);
 
   sidebarDashboards.innerHTML = '';
   for (const dashboard of dashboards ?? []) {

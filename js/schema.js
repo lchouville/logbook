@@ -149,7 +149,8 @@ function buildCustomFieldLi(field, value, idPrefix) {
   const handle = document.createElement('span');
   handle.className = 'drag-handle';
   handle.setAttribute('aria-hidden', 'true');
-  handle.textContent = '⠿';
+  handle.innerHTML =
+    '<svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg>';
   li.appendChild(handle);
 
   const label = document.createElement('label');

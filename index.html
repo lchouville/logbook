@@ -8,6 +8,7 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
   <section id="auth">
     <h1>Logbook</h1>
     <p>Journal de bord — en construction.</p>
@@ -16,13 +17,17 @@
   </section>
 
   <div id="app-shell" hidden>
-    <button id="sidebar-toggle" type="button" aria-label="Ouvrir/fermer le menu">☰</button>
+    <button id="sidebar-toggle" type="button" aria-label="Ouvrir/fermer le menu">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1 4h14M1 8h14M1 12h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
     <nav id="sidebar">
       <div id="sidebar-profile">
         <button id="sidebar-profile-button" type="button" aria-haspopup="true" aria-expanded="false">
           <span id="sidebar-owner-avatar" aria-hidden="true"></span>
           <span id="sidebar-owner-name"></span>
-          <span id="sidebar-profile-chevron" aria-hidden="true">▾</span>
+          <span id="sidebar-profile-chevron" aria-hidden="true">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
         </button>
         <div id="sidebar-profile-menu" hidden>
           <button id="sidebar-settings-button" type="button">Paramètres</button>
@@ -36,7 +41,7 @@
       <button id="sidebar-partage-button" type="button">Partage</button>
       <button id="sidebar-modeles-button" type="button">Modèles</button>
     </nav>
-    <main id="main-content">
+    <main id="main-content" tabindex="-1">
       <section id="entries">
         <div id="entries-header">
           <h2>Entrées</h2>
@@ -51,12 +56,12 @@
           <table id="entry-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Titre</th>
-                <th>Thème(s)</th>
-                <th>Niveau</th>
-                <th>Statut</th>
-                <th>Texte</th>
+                <th scope="col">Date</th>
+                <th scope="col">Titre</th>
+                <th scope="col">Thème(s)</th>
+                <th scope="col">Niveau</th>
+                <th scope="col">Statut</th>
+                <th scope="col">Texte</th>
               </tr>
             </thead>
             <tbody id="entry-table-body"></tbody>
@@ -96,7 +101,7 @@
           <input id="schema-field-options" type="text" hidden>
 
           <button type="submit">Enregistrer</button>
-          <button id="schema-field-delete" type="button" hidden>Supprimer</button>
+          <button id="schema-field-delete" type="button" class="button-danger" hidden>Supprimer</button>
         </form>
       </div>
 
@@ -108,13 +113,13 @@
           <table id="viewer-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Titre</th>
-                <th>Thème(s)</th>
-                <th>Niveau</th>
-                <th>Statut</th>
-                <th>Texte</th>
-                <th>Ressenti à froid</th>
+                <th scope="col">Date</th>
+                <th scope="col">Titre</th>
+                <th scope="col">Thème(s)</th>
+                <th scope="col">Niveau</th>
+                <th scope="col">Statut</th>
+                <th scope="col">Texte</th>
+                <th scope="col">Ressenti à froid</th>
               </tr>
             </thead>
             <tbody id="viewer-table-body"></tbody>
@@ -144,6 +149,14 @@
           <option value="jamais">Jamais (illimité)</option>
         </select>
         <p class="field-hint">Au-delà de cette durée depuis ta dernière connexion, l'app te redemandera de te reconnecter explicitement — propre à ce navigateur, pas synchronisé.</p>
+
+        <label for="entries-page-size-select">Entrées chargées à la fois</label>
+        <select id="entries-page-size-select">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
 
         <p id="settings-error" role="alert"></p>
         <p><a href="confidentialite.html">Politique de confidentialité</a></p>
@@ -184,7 +197,9 @@
   <div id="modal-root" hidden>
     <div id="modal-backdrop"></div>
     <div id="modal-panel" role="dialog" aria-modal="true">
-      <button id="modal-close" type="button" aria-label="Fermer">×</button>
+      <button id="modal-close" type="button" aria-label="Fermer">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
       <section id="entry-form-modal" hidden>
         <h2 id="entry-form-title">Nouvelle entrée</h2>
         <form id="entry-form">
@@ -201,19 +216,19 @@
           <div id="entry-blocks-section" class="fields-editor-section">
             <ul id="entry-blocks-list" class="fields-editor-list">
               <li class="entry-block-row" draggable="true" data-order-key="themes">
-                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
                 <label for="entry-themes">Thème(s)</label>
                 <select id="entry-themes" multiple required></select>
               </li>
               <li class="entry-block-row" draggable="true" data-order-key="niveau">
-                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
                 <label for="entry-niveau">Niveau d'accès</label>
                 <select id="entry-niveau" required>
                   <option value="" disabled selected>Choisir…</option>
                 </select>
               </li>
               <li class="entry-block-row" draggable="true" data-order-key="statut">
-                <span class="drag-handle" aria-hidden="true">⠿</span>
+                <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
                 <label for="entry-statut">Statut</label>
                 <select id="entry-statut" required>
                   <option value="" disabled selected>Choisir…</option>
