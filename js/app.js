@@ -1,4 +1,4 @@
-import { onAuthChange, signIn, signOut } from './auth.js';
+import { onAuthChange, signIn, signOut, getSessionDuration, setSessionDuration } from './auth.js';
 import {
   loadEntries,
   saveEntries,
@@ -33,6 +33,7 @@ import {
   previewContenuTexte,
   resolveTitreModele,
   buildBilanRituelDuSoir,
+  buildBilanMensuelRituelDuSoir,
   NIVEAUX_ACCES,
   STATUTS,
   THEMES,
@@ -45,6 +46,8 @@ import { renderJournalPartage } from './viewer.js';
 import { createFieldsEditor } from './schema.js';
 import { createContentEditor } from './contenu.js';
 
+const APP_VERSION = '0.1.0';
+
 const authSection = document.getElementById('auth');
 const signInButton = document.getElementById('sign-in');
 const authStatus = document.getElementById('auth-status');
@@ -52,7 +55,10 @@ const appShell = document.getElementById('app-shell');
 const signOutButton = document.getElementById('sign-out');
 
 const themeSelect = document.getElementById('theme-select');
+const sessionDurationSelect = document.getElementById('session-duration-select');
 const settingsError = document.getElementById('settings-error');
+const appVersionEl = document.getElementById('app-version');
+appVersionEl.textContent = `Version ${APP_VERSION}`;
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
 const modelesSection = document.getElementById('modeles');
@@ -105,6 +111,8 @@ const modeleBlocksList = document.getElementById('modele-blocks-list');
 const modeleAddFieldButton = document.getElementById('modele-add-field-button');
 const modeleSubmit = document.getElementById('modele-submit');
 const modeleCancel = document.getElementById('modele-cancel');
+const modeleBilansList = document.getElementById('modele-bilans-list');
+const modeleBilanAddButton = document.getElementById('modele-bilan-add-button');
 const modeleList = document.getElementById('modele-list');
 const modeleListDefaut = document.getElementById('modele-list-defaut');
 const modeleError = document.getElementById('modele-error');
@@ -123,7 +131,12 @@ let editingEntryModeleId = null;
 let activeTitrePattern = null;
 let activeTitreRang = null;
 let activeCalculAuto = null;
+let activeSourceModeleId = null;
 let editingModeleId = null;
+// Bilans en cours d'édition dans le formulaire de modèle (sous-modèles portés
+// par `modele.bilans`, pas des entités Drive séparées) : liste de travail
+// locale, écrite dans le modèle parent seulement à la soumission du formulaire.
+let modeleBilans = [];
 let ownerName = null;
 let currentJournalId = null;
 // Page affichée dans #main-content : 'entries' | 'modeles' | 'settings' | 'partages' | 'acces'.
@@ -148,6 +161,12 @@ function buildPartageLink(fichierId) {
 function getJournalIdFromUrl() {
   return new URLSearchParams(window.location.search).get('journal');
 }
+
+// Préférence locale au navigateur (pas de Drive) : affichable/modifiable dès le départ.
+sessionDurationSelect.value = getSessionDuration();
+sessionDurationSelect.addEventListener('change', () => {
+  setSessionDuration(sessionDurationSelect.value);
+});
 
 themeSelect.addEventListener('change', async () => {
   settingsError.textContent = '';
@@ -371,7 +390,8 @@ function appendCell(row, text) {
 
 function renderEntries() {
   entryTableBody.innerHTML = '';
-  for (const entry of [...entries].reverse()) {
+  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date) || a.titre.localeCompare(b.titre));
+  for (const entry of sorted) {
     const row = document.createElement('tr');
     row.dataset.entryId = entry.id;
 
@@ -391,6 +411,7 @@ function stopEditEntry() {
   editingEntryModeleId = null;
   activeTitrePattern = null;
   activeCalculAuto = null;
+  activeSourceModeleId = null;
   entryForm.reset();
   entryRessentiFroidSlot.hidden = true;
   entryRessentiFroidSlot.innerHTML = '';
@@ -448,10 +469,19 @@ function cloneContenuSchema(schema) {
   };
 }
 
-function renderBilanRituelContenu(dateIso) {
-  const rituelModele = modeles.find((m) => m.nom === 'Rituel du soir');
-  const entriesRituel = rituelModele ? entries.filter((e) => e.modeleId === rituelModele.id) : [];
-  const { contenuSchema, contenuValeurs } = buildBilanRituelDuSoir(entriesRituel, dateIso);
+const BILAN_BUILDERS = {
+  'bilan-rituel-du-soir': buildBilanRituelDuSoir,
+  'bilan-mensuel-rituel-du-soir': buildBilanMensuelRituelDuSoir,
+};
+
+// sourceModeleId : id du modèle (n'importe lequel comportant un bloc tableau
+// de mesures) dont les entrées sont agrégées pour le bilan — porté par le
+// modèle de bilan lui-même (`modele.sourceModeleId`), pas câblé en dur sur
+// un nom de modèle particulier.
+function renderBilanRituelContenu(dateIso, calculAuto, sourceModeleId) {
+  const entriesSource = sourceModeleId ? entries.filter((e) => e.modeleId === sourceModeleId) : [];
+  const builder = BILAN_BUILDERS[calculAuto] ?? buildBilanRituelDuSoir;
+  const { contenuSchema, contenuValeurs } = builder(entriesSource, dateIso);
   entryContentEditor.render(contenuSchema, contenuValeurs, true);
 }
 
@@ -472,16 +502,28 @@ function applyModeleToForm(modele) {
     },
     { ...(modele.champsPersonnalises ?? {}) },
   );
-  if (modele.calculAuto === 'bilan-rituel-du-soir') {
-    activeCalculAuto = modele.calculAuto;
-    renderBilanRituelContenu(entryDate.value);
-  } else {
-    entryContentEditor.render(
-      cloneContenuSchema(modele.contenuSchema),
-      { ...(modele.contenuValeursParDefaut ?? {}) },
-      true,
-    );
+  entryContentEditor.render(cloneContenuSchema(modele.contenuSchema), { ...(modele.contenuValeursParDefaut ?? {}) }, true);
+  openModal('entry-form-modal');
+}
+
+// Un bilan est un sous-modèle de `modele` (dans `modele.bilans`), pas une entité
+// Drive séparée : il hérite des thèmes/niveau d'accès du modèle parent (le
+// statut est toujours « Bilan ») et agrège les entrées dont le `modeleId` est
+// celui du parent — jamais celui du bilan lui-même, pour ne pas réagréger ses
+// propres entrées de bilan au prochain calcul.
+function applyBilanToForm(modele, bilan) {
+  stopEditEntry();
+  editingEntryModeleId = bilan.id;
+  activeTitrePattern = bilan.titrePattern || null;
+  activeTitreRang = entries.filter((e) => e.modeleId === bilan.id).length + 1;
+  if (activeTitrePattern) {
+    entryTitre.value = resolveTitreModele(activeTitrePattern, { date: entryDate.value, id: activeTitreRang });
   }
+  applyFixedFieldsToForm({ themes: modele.themes, niveauAcces: modele.niveauAcces, statut: 'Bilan' }, entryFixedFieldEls);
+  entryFieldsEditor.render({ fields: [], order: [...FIXED_BLOCK_KEYS] }, {});
+  activeCalculAuto = bilan.calculAuto;
+  activeSourceModeleId = modele.id;
+  renderBilanRituelContenu(entryDate.value, activeCalculAuto, activeSourceModeleId);
   openModal('entry-form-modal');
 }
 
@@ -683,6 +725,63 @@ const modeleFixedFieldEls = {
   statut: modeleStatut,
 };
 
+const BILAN_FREQUENCE_LABELS = {
+  'bilan-rituel-du-soir': 'Hebdomadaire',
+  'bilan-mensuel-rituel-du-soir': 'Mensuel',
+};
+
+function renderModeleBilans() {
+  modeleBilansList.innerHTML = '';
+  for (const bilan of modeleBilans) {
+    const li = document.createElement('li');
+    li.className = 'modele-bilan-row';
+
+    const nomInput = document.createElement('input');
+    nomInput.type = 'text';
+    nomInput.placeholder = 'Nom du bilan';
+    nomInput.value = bilan.nom;
+    nomInput.addEventListener('input', () => (bilan.nom = nomInput.value));
+    li.appendChild(nomInput);
+
+    const titreInput = document.createElement('input');
+    titreInput.type = 'text';
+    titreInput.placeholder = 'Titre (ex : Bilan du {date})';
+    titreInput.value = bilan.titrePattern;
+    titreInput.addEventListener('input', () => (bilan.titrePattern = titreInput.value));
+    li.appendChild(titreInput);
+
+    const frequenceSelect = document.createElement('select');
+    for (const [value, label] of Object.entries(BILAN_FREQUENCE_LABELS)) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      frequenceSelect.appendChild(option);
+    }
+    frequenceSelect.value = bilan.calculAuto;
+    frequenceSelect.addEventListener('change', () => (bilan.calculAuto = frequenceSelect.value));
+    li.appendChild(frequenceSelect);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Supprimer';
+    deleteButton.addEventListener('click', () => {
+      modeleBilans = modeleBilans.filter((b) => b.id !== bilan.id);
+      renderModeleBilans();
+    });
+    li.appendChild(deleteButton);
+
+    modeleBilansList.appendChild(li);
+  }
+}
+
+modeleBilanAddButton.addEventListener('click', () => {
+  modeleBilans = [
+    ...modeleBilans,
+    { id: crypto.randomUUID(), nom: '', titrePattern: '', calculAuto: 'bilan-rituel-du-soir' },
+  ];
+  renderModeleBilans();
+});
+
 function startEditModele(modele) {
   editingModeleId = modele.id;
   modeleNom.value = modele.nom;
@@ -690,6 +789,8 @@ function startEditModele(modele) {
   applyFixedFieldsToForm(modele, modeleFixedFieldEls);
   modeleFieldsEditor.render(modele.champsSchema ?? { fields: [], order: [] }, modele.champsPersonnalises ?? {});
   modeleContentEditor.render(modele.contenuSchema, modele.contenuValeursParDefaut ?? {}, false);
+  modeleBilans = (modele.bilans ?? []).map((b) => ({ ...b }));
+  renderModeleBilans();
   modeleFormTitle.textContent = 'Modifier le modèle';
   modeleSubmit.textContent = 'Enregistrer les modifications';
   modeleCancel.hidden = false;
@@ -702,6 +803,8 @@ function stopEditModele() {
   modeleForm.reset();
   modeleFieldsEditor.render({ fields: [], order: [] }, {});
   modeleContentEditor.render(blankContenuSchema(), {}, false);
+  modeleBilans = [];
+  renderModeleBilans();
   modeleFormTitle.textContent = 'Nouveau modèle';
   modeleSubmit.textContent = 'Créer le modèle';
   modeleCancel.hidden = true;
@@ -828,6 +931,7 @@ modeleForm.addEventListener('submit', async (event) => {
   const champsSchema = modeleFieldsEditor.getSchema();
   const contenuSchema = modeleContentEditor.getSchema();
   const contenuValeursParDefaut = modeleContentEditor.getValues();
+  const bilans = modeleBilans.filter((b) => b.nom.trim()).map((b) => ({ ...b, nom: b.nom.trim() }));
   const previousModeles = modeles;
   const previousEntries = entries;
   let entriesChanged = false;
@@ -849,7 +953,7 @@ modeleForm.addEventListener('submit', async (event) => {
     }
     modeles = modeles.map((m) =>
       m.id === editingModeleId
-        ? { ...m, nom, titrePattern, ...fixed, champsPersonnalises, champsSchema, contenuSchema, contenuValeursParDefaut }
+        ? { ...m, nom, titrePattern, ...fixed, champsPersonnalises, champsSchema, contenuSchema, contenuValeursParDefaut, bilans }
         : m,
     );
   } else {
@@ -864,6 +968,7 @@ modeleForm.addEventListener('submit', async (event) => {
         champsSchema,
         contenuSchema,
         contenuValeursParDefaut,
+        bilans,
         creeLe: new Date().toISOString(),
       },
     ];
@@ -997,6 +1102,16 @@ function renderEntryNewMenu() {
     button.textContent = modele.nom;
     button.dataset.modeleId = modele.id;
     entryNewMenu.appendChild(button);
+
+    for (const bilan of modele.bilans ?? []) {
+      const bilanButton = document.createElement('button');
+      bilanButton.type = 'button';
+      bilanButton.className = 'entry-new-menu-bilan';
+      bilanButton.textContent = `↳ ${bilan.nom}`;
+      bilanButton.dataset.modeleId = modele.id;
+      bilanButton.dataset.bilanId = bilan.id;
+      entryNewMenu.appendChild(bilanButton);
+    }
   }
 }
 
@@ -1014,7 +1129,10 @@ entryNewMenu.addEventListener('click', (event) => {
   if (!button) return;
   closeEntryNewMenu();
   const modele = modeles.find((m) => m.id === button.dataset.modeleId);
-  if (modele) {
+  const bilan = modele && button.dataset.bilanId ? modele.bilans?.find((b) => b.id === button.dataset.bilanId) : null;
+  if (bilan) {
+    applyBilanToForm(modele, bilan);
+  } else if (modele) {
     applyModeleToForm(modele);
   } else {
     openBlankEntryForm();
@@ -1034,8 +1152,8 @@ entryDate.addEventListener('change', () => {
   if (activeTitrePattern) {
     entryTitre.value = resolveTitreModele(activeTitrePattern, { date: entryDate.value, id: activeTitreRang });
   }
-  if (activeCalculAuto === 'bilan-rituel-du-soir') {
-    renderBilanRituelContenu(entryDate.value);
+  if (BILAN_BUILDERS[activeCalculAuto]) {
+    renderBilanRituelContenu(entryDate.value, activeCalculAuto, activeSourceModeleId);
   }
 });
 

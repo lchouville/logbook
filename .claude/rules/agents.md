@@ -12,3 +12,11 @@ Un agent ne s'exécute que quand on le sollicite explicitement pour une tâche (
 - **Spécialistes** (un domaine chacun, ne sortent pas de leur lane) : `conception`, `backend`, `api`, `design-web`, `securite`, `devops`, `documentation`.
 
 Pour une demande multi-domaine : chef d'entreprise → `chef-equipe` → spécialistes concernés. Pour une demande mono-domaine évidente, le chef d'entreprise peut déléguer directement au spécialiste sans passer par le chef d'équipe.
+
+## Utilisation des skills
+
+Avant de démarrer une tâche non triviale, chef d'entreprise, chef d'équipe et spécialistes vérifient s'il existe un skill disponible qui améliore la qualité ou la performance du travail à faire (ex. `code-review`/`simplify` en fin d'implémentation, `security-review` sur du code sensible, `dataviz` pour une visualisation, etc.) plutôt que d'improviser systématiquement une approche maison là où un skill existant couvre déjà le besoin.
+
+- Le chef d'équipe, quand il dispatche une tâche à un spécialiste, indique le skill à utiliser s'il en a identifié un pertinent pour cette tâche.
+- Un spécialiste qui repère lui-même un skill pertinent à son domaine (non signalé par le chef d'équipe) peut l'utiliser directement, sans attendre une instruction explicite.
+- Ne pas lancer un skill par réflexe sur une tâche triviale (fix d'une ligne, question simple, action déjà couverte par les outils de base) : l'usage doit rester justifié par un vrai gain de qualité ou de performance, pas systématique.

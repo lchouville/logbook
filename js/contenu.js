@@ -36,7 +36,20 @@ function buildGraphiqueBlockContent(value) {
   axeX.setAttribute('class', 'contenu-graphique-axe');
   svg.appendChild(axeX);
 
+  // Au-delà d'une poignée de points (ex. les ~30 jours d'un bilan mensuel),
+  // étiqueter chaque date les ferait toutes se chevaucher. Répartir les
+  // étiquettes à intervalles réguliers sur tout l'axe (plutôt qu'un pas fixe
+  // avec le dernier point forcé en plus) garantit premier et dernier jour
+  // inclus sans jamais coller deux étiquettes l'une à l'autre.
+  const maxLabels = 8;
+  const labelCount = Math.min(maxLabels, dates.length);
+  const labelIndexes = new Set(
+    Array.from({ length: labelCount }, (_, k) =>
+      Math.round((k * (dates.length - 1)) / Math.max(1, labelCount - 1)),
+    ),
+  );
   dates.forEach((date, i) => {
+    if (!labelIndexes.has(i)) return;
     const label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('x', x(i));
     label.setAttribute('y', height - 6);
@@ -207,7 +220,14 @@ function buildTableauBlockContent(block, value, idPrefix, locked, onMutate) {
     tbody.appendChild(addRowTr);
   }
   table.appendChild(tbody);
-  return table;
+
+  // Scroll horizontal dédié : un bilan mensuel a ~31 colonnes, bien plus que
+  // les tableaux de mesures habituels (1-7) — sans ça le tableau se tasse
+  // dans la largeur de la carte et les chiffres deviennent illisibles.
+  const wrapper = document.createElement('div');
+  wrapper.className = 'contenu-tableau-scroll';
+  wrapper.appendChild(table);
+  return wrapper;
 }
 
 function readBlockValue(listEl, block, idPrefix, currentValue) {

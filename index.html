@@ -130,8 +130,24 @@
           <option value="light">Clair</option>
           <option value="dark">Sombre</option>
         </select>
+
+        <label for="session-duration-select">Rester connecté</label>
+        <select id="session-duration-select">
+          <option value="1h">1 heure</option>
+          <option value="5h">5 heures</option>
+          <option value="1j">1 jour</option>
+          <option value="7j">7 jours</option>
+          <option value="30j">30 jours</option>
+          <option value="4mois">4 mois</option>
+          <option value="8mois">8 mois</option>
+          <option value="1an">1 an</option>
+          <option value="jamais">Jamais (illimité)</option>
+        </select>
+        <p class="field-hint">Au-delà de cette durée depuis ta dernière connexion, l'app te redemandera de te reconnecter explicitement — propre à ce navigateur, pas synchronisé.</p>
+
         <p id="settings-error" role="alert"></p>
         <p><a href="confidentialite.html">Politique de confidentialité</a></p>
+        <p id="app-version" class="field-hint"></p>
       </section>
 
       <section id="partages" hidden>
@@ -264,6 +280,13 @@
               <button id="modele-contenu-add-texte" type="button">+ Bloc texte</button>
               <button id="modele-contenu-add-tableau" type="button">+ Bloc tableau</button>
             </div>
+          </div>
+
+          <div id="modele-bilans-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Bilans</h3>
+            <p class="field-hint">Un bilan agrège automatiquement les entrées créées via ce modèle (il lui faut un bloc tableau de mesures) sur une semaine ou un mois.</p>
+            <ul id="modele-bilans-list"></ul>
+            <button id="modele-bilan-add-button" type="button" class="fields-editor-add-button">+ Ajouter un bilan</button>
           </div>
 
           <button id="modele-submit" type="submit">Créer le modèle</button>
