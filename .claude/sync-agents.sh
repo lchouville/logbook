@@ -59,6 +59,10 @@ if [ -f "$gitignore_file" ]; then
     skip!=1 {print}
   ' "$gitignore_file" > "$tmp_gitignore"
 fi
+# trim trailing blank lines so the block below doesn't accumulate blank lines on every sync
+while [ -s "$tmp_gitignore" ] && [ -z "$(tail -n1 "$tmp_gitignore")" ]; do
+  sed -i '$d' "$tmp_gitignore"
+done
 {
   cat "$tmp_gitignore"
   echo ""
