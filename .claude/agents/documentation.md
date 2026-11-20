@@ -1,7 +1,7 @@
 ---
 name: documentation
 description: Spécialiste documentation. README, notes de version, documentation technique/utilisateur. À utiliser en fin de dispatch, une fois le résultat final connu, pour le documenter.
-tools: Read, Grep, Glob, Write, Edit
+tools: Read, Grep, Glob, Write, Edit, Skill
 model: haiku
 effort: low
 ---
