@@ -4,3 +4,14 @@ Thumbs.db
 .vscode/
 .idea/
 js/config.js
+
+# Shared Claude agents/rules/skills: fetched locally by .claude/sync-agents.sh
+# from MyClaude, never committed here. Edit shared ones in MyClaude instead.
+.claude/agents/
+.claude/.agents-sync-rules-manifest
+.claude/.agents-sync-skills-manifest
+.claude/rules/*
+!.claude/rules/project.md
+.claude/skills/*
+!.claude/skills/lean-workflow/
+!.claude/skills/remplir-journal/
