@@ -44,6 +44,18 @@ const MESURES_RITUEL_NUMERIQUES = [
   'Energie Journée',
   'Energie Soir',
   "Envie d'entamer une transition",
+  'Genre perçu (réel)',
+  'Confort (réel)',
+  'Stress (réel)',
+  'Ressenti (réel)',
+  'Comment elle me va - moi (réel)',
+  'Comment elle me va - IA (réel)',
+  'Genre perçu (féminisé)',
+  'Confort (féminisé)',
+  'Stress (féminisé)',
+  'Ressenti (féminisé)',
+  'Envie de ressembler à ça ? (féminisé)',
+  'Comment elle me va - IA (féminisé)',
 ];
 
 // Construit le Contenu (tableau + graphique) d'un bilan à partir des entrées

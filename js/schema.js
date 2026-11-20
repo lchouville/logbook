@@ -1,4 +1,5 @@
 import { onModalClose } from './modal.js';
+import { uploadPhoto, deletePhoto, fetchPhotoBlob } from './drive.js';
 
 const CHAMP_TYPE_LABELS = {
   texte: 'Texte',
@@ -6,6 +7,7 @@ const CHAMP_TYPE_LABELS = {
   date: 'Date',
   select: 'Liste',
   case: 'Case à cocher',
+  photo: 'Photo',
 };
 
 const modalPanel = document.getElementById('modal-panel');
@@ -111,9 +113,58 @@ document.addEventListener('keydown', (event) => {
 modalPanel.addEventListener('scroll', closeFieldEditor);
 onModalClose(closeFieldEditor);
 
+// L'id Drive de la photo n'est pas affichable directement dans <img src> (fichier
+// privé, nécessite le header Authorization) : on récupère le blob via l'API puis on
+// en fait une object URL, révoquée dès que remplacée pour ne pas fuir de mémoire.
+async function loadPhotoPreview(fileId, img) {
+  const blob = await fetchPhotoBlob(fileId).catch(() => null);
+  if (!blob) return;
+  if (img.dataset.objectUrl) URL.revokeObjectURL(img.dataset.objectUrl);
+  const url = URL.createObjectURL(blob);
+  img.dataset.objectUrl = url;
+  img.src = url;
+  img.hidden = false;
+}
+
 function buildFieldInput(field, value, idPrefix) {
   let input;
-  if (field.type === 'select') {
+  if (field.type === 'photo') {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'champ-photo';
+    wrapper.dataset.value = value ?? '';
+    const img = document.createElement('img');
+    img.className = 'champ-photo-preview';
+    img.alt = field.nom;
+    img.hidden = true;
+    wrapper.appendChild(img);
+    if (value) loadPhotoPreview(value, img);
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.id = `${idPrefix}-${field.id}-file`;
+    wrapper.appendChild(fileInput);
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const oldValue = wrapper.dataset.value;
+      const fileId = await uploadPhoto(file, field.id);
+      wrapper.dataset.value = fileId;
+      await loadPhotoPreview(fileId, img);
+      if (oldValue) deletePhoto(oldValue).catch(() => {});
+    });
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.textContent = 'Retirer la photo';
+    removeButton.addEventListener('click', () => {
+      const oldValue = wrapper.dataset.value;
+      wrapper.dataset.value = '';
+      img.hidden = true;
+      fileInput.value = '';
+      if (oldValue) deletePhoto(oldValue).catch(() => {});
+    });
+    wrapper.appendChild(removeButton);
+    input = wrapper;
+  } else if (field.type === 'select') {
     input = document.createElement('select');
     const empty = document.createElement('option');
     empty.value = '';
@@ -154,7 +205,7 @@ function buildCustomFieldLi(field, value, idPrefix) {
   li.appendChild(handle);
 
   const label = document.createElement('label');
-  label.setAttribute('for', `${idPrefix}-${field.id}`);
+  label.setAttribute('for', field.type === 'photo' ? `${idPrefix}-${field.id}-file` : `${idPrefix}-${field.id}`);
   label.textContent = field.nom;
   li.appendChild(label);
 
@@ -179,6 +230,8 @@ function readFieldValues(listEl, schema, idPrefix) {
       values[field.id] = input.valueAsNumber;
     } else if (field.type === 'case') {
       values[field.id] = input.checked;
+    } else if (field.type === 'photo') {
+      values[field.id] = input.dataset.value || '';
     } else {
       values[field.id] = input.value;
     }

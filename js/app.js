@@ -21,6 +21,7 @@ import {
   loadDashboards,
   saveDashboards,
   createDashboardFolder,
+  deletePhoto,
 } from './drive.js';
 import {
   createEntry,
@@ -56,6 +57,7 @@ const signOutButton = document.getElementById('sign-out');
 
 const themeSelect = document.getElementById('theme-select');
 const entriesPageSizeSelect = document.getElementById('entries-page-size-select');
+const confirmDashboardDeleteCheckbox = document.getElementById('confirm-dashboard-delete-checkbox');
 const sessionDurationSelect = document.getElementById('session-duration-select');
 const settingsError = document.getElementById('settings-error');
 const appVersionEl = document.getElementById('app-version');
@@ -203,6 +205,20 @@ entriesPageSizeSelect.addEventListener('change', async () => {
     setViewerPageSize(previousPageSize);
     entriesPageSizeSelect.value = String(previousPageSize);
     settings = { ...settings, entriesPageSize: previousPageSize };
+    settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
+
+confirmDashboardDeleteCheckbox.addEventListener('change', async () => {
+  settingsError.textContent = '';
+  const previousValue = settings.confirmDashboardDeleteByName ?? true;
+  const value = confirmDashboardDeleteCheckbox.checked;
+  settings = { ...settings, confirmDashboardDeleteByName: value };
+  try {
+    await saveSettings(settings);
+  } catch (error) {
+    settings = { ...settings, confirmDashboardDeleteByName: previousValue };
+    confirmDashboardDeleteCheckbox.checked = previousValue;
     settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
   }
 });
@@ -1141,6 +1157,9 @@ initSidebar({
   onSelectDashboard: switchDashboard,
   onCreateDashboard: createDashboard,
   onRenameDashboard: renameDashboard,
+  onArchiveDashboard: archiveDashboard,
+  onUnarchiveDashboard: unarchiveDashboard,
+  onDeleteDashboard: deleteDashboard,
 });
 
 modeleNewButton.addEventListener('click', () => {
@@ -1299,9 +1318,13 @@ entryDeleteButton.addEventListener('click', async () => {
   if (!window.confirm('Supprimer définitivement cette entrée ?')) return;
   entryError.textContent = '';
   const previousEntries = entries;
+  const deleted = entries.find((e) => e.id === editingEntryId);
   entries = entries.filter((e) => e.id !== editingEntryId);
   try {
     await saveEntries(entries);
+    deleted.champsSchema.fields
+      .filter((f) => f.type === 'photo' && deleted.champsPersonnalises[f.id])
+      .forEach((f) => deletePhoto(deleted.champsPersonnalises[f.id]).catch(() => {}));
     await syncPartages();
     renderEntries();
     stopEditEntry();
@@ -1438,6 +1461,7 @@ async function loadAccountData() {
     entriesPageSize = settings.entriesPageSize ?? ENTRIES_PAGE_SIZE_DEFAULT;
     setViewerPageSize(entriesPageSize);
     entriesPageSizeSelect.value = String(entriesPageSize);
+    confirmDashboardDeleteCheckbox.checked = settings.confirmDashboardDeleteByName ?? true;
   })();
 
   const loadEntriesTask = (async () => {
@@ -1585,6 +1609,76 @@ async function renameDashboard(dashboardId) {
   } catch (error) {
     dashboards = previousDashboards;
     sidebarDashboardsError.textContent = `Échec du renommage : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
+// Archiver ne touche à aucune donnée Drive : juste un drapeau sur le registre qui
+// sort le tableau de la liste active (voir sidebar.js) sans rien déplacer ni dupliquer.
+async function archiveDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  if (!window.confirm(`Archiver « ${dashboard.nom} » ? Il restera consultable dans les tableaux archivés.`)) return;
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  dashboards = dashboards.map((d) => (d.id === dashboardId ? { ...d, archive: true } : d));
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  try {
+    await saveDashboards(dashboards);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de l'archivage : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
+async function unarchiveDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  dashboards = dashboards.map((d) => (d.id === dashboardId ? { ...d, archive: false } : d));
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  try {
+    await saveDashboards(dashboards);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de la désarchivage : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
+// Suppression définitive : retire le tableau du registre puis supprime son dossier
+// Drive (DELETE sur un dossier non vide efface aussi son contenu en cascade côté API).
+async function deleteDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  if (dashboards.length === 1) {
+    sidebarDashboardsError.textContent = 'Impossible de supprimer le dernier tableau de bord.';
+    return;
+  }
+  if (settings.confirmDashboardDeleteByName ?? true) {
+    const saisie = window.prompt(
+      `Suppression définitive et irréversible de « ${dashboard.nom} » et de toutes ses entrées.\nRetape le nom du tableau de bord pour confirmer :`,
+    );
+    if (saisie !== dashboard.nom) return;
+  } else if (
+    !window.confirm(`Supprimer définitivement « ${dashboard.nom} » et toutes ses entrées ? Cette action est irréversible.`)
+  ) {
+    return;
+  }
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  const wasActive = dashboardId === activeDashboardId;
+  dashboards = dashboards.filter((d) => d.id !== dashboardId);
+  try {
+    await saveDashboards(dashboards);
+    if (dashboard.dossierId) await deleteSharedFile(dashboard.dossierId);
+    if (wasActive) await switchDashboard(dashboards[0].id);
+    else renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de la suppression : ${error.message}`;
     renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
   }
 }
