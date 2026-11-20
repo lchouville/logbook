@@ -1,7 +1,7 @@
 ---
 name: conception
 description: Spécialiste conception/architecture. Cahier des charges, modèle de données, user flows, choix techniques et d'architecture avant implémentation. À utiliser en amont d'une tâche backend/api/design-web non triviale pour fixer les décisions structurantes.
-tools: Read, Grep, Glob, WebSearch, Write
+tools: Read, Grep, Glob, WebSearch, Write, Skill
 model: sonnet
 effort: high
 ---
