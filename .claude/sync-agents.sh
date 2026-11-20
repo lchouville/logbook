@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Sync shared agents/rules from https://github.com/lchouville/MyClaude into
-# this project's .claude/agents and .claude/rules. Run automatically by the
-# SessionStart hook (see .claude/settings.json); safe to re-run manually.
+# Sync shared agents/rules/skills from https://github.com/lchouville/MyClaude
+# into this project's .claude/, and keep the project .gitignore in sync so
+# none of it is ever committed here (edit shared ones in MyClaude instead).
+# Run automatically by the SessionStart hook (see .claude/settings.json);
+# safe to re-run manually.
 set -euo pipefail
 
 cache="$HOME/.claude-agents-shared"
@@ -42,3 +44,30 @@ if [ -d "$cache/skills" ]; then
   done
   (cd "$cache/skills" && printf '%s\n' */) | sed 's#/$##' > "$skills_manifest"
 fi
+
+# Keep the project .gitignore's shared-elements block in sync with what was
+# actually just synced, so a newly-shared/unshared rule or skill updates the
+# ignore list automatically instead of needing a manual edit.
+gitignore_file="$(dirname "$dir")/.gitignore"
+block_start="# >>> myclaude-sync: shared agents/rules/skills, never commit (auto-generated) >>>"
+block_end="# <<< myclaude-sync <<<"
+tmp_gitignore="$(mktemp)"
+if [ -f "$gitignore_file" ]; then
+  awk -v s="$block_start" -v e="$block_end" '
+    $0==s {skip=1; next}
+    $0==e {skip=0; next}
+    skip!=1 {print}
+  ' "$gitignore_file" > "$tmp_gitignore"
+fi
+{
+  cat "$tmp_gitignore"
+  echo ""
+  echo "$block_start"
+  echo ".claude/agents/"
+  echo ".claude/.agents-sync-rules-manifest"
+  echo ".claude/.agents-sync-skills-manifest"
+  [ -f "$rules_manifest" ] && while IFS= read -r f; do [ -n "$f" ] && echo ".claude/rules/$f"; done < "$rules_manifest"
+  [ -f "$skills_manifest" ] && while IFS= read -r s; do [ -n "$s" ] && echo ".claude/skills/$s/"; done < "$skills_manifest"
+  echo "$block_end"
+} > "$gitignore_file"
+rm -f "$tmp_gitignore"

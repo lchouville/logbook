@@ -5,13 +5,19 @@ Thumbs.db
 .idea/
 js/config.js
 
-# Shared Claude agents/rules/skills: fetched locally by .claude/sync-agents.sh
-# from MyClaude, never committed here. Edit shared ones in MyClaude instead.
+# >>> myclaude-sync: shared agents/rules/skills, never commit (auto-generated) >>>
 .claude/agents/
 .claude/.agents-sync-rules-manifest
 .claude/.agents-sync-skills-manifest
-.claude/rules/*
-!.claude/rules/project.md
-.claude/skills/*
-!.claude/skills/lean-workflow/
-!.claude/skills/remplir-journal/
+.claude/rules/agents.md
+.claude/rules/cicd.md
+.claude/rules/communication.md
+.claude/rules/design.md
+.claude/rules/docs.md
+.claude/rules/git.md
+.claude/rules/quality.md
+.claude/rules/workflow.md
+.claude/skills/brief-agent/
+.claude/skills/dispatch-taches/
+.claude/skills/lean-workflow/
+# <<< myclaude-sync <<<
