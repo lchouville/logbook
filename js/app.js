@@ -21,6 +21,7 @@ import {
   loadDashboards,
   saveDashboards,
   createDashboardFolder,
+  deletePhoto,
 } from './drive.js';
 import {
   createEntry,
@@ -42,7 +43,7 @@ import {
 import { applyTheme, DEFAULT_THEME } from './theme.js';
 import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
 import { openModal, closeModal } from './modal.js';
-import { renderJournalPartage } from './viewer.js';
+import { renderJournalPartage, setViewerPageSize } from './viewer.js';
 import { createFieldsEditor } from './schema.js';
 import { createContentEditor } from './contenu.js';
 
@@ -55,6 +56,8 @@ const appShell = document.getElementById('app-shell');
 const signOutButton = document.getElementById('sign-out');
 
 const themeSelect = document.getElementById('theme-select');
+const entriesPageSizeSelect = document.getElementById('entries-page-size-select');
+const confirmDashboardDeleteCheckbox = document.getElementById('confirm-dashboard-delete-checkbox');
 const sessionDurationSelect = document.getElementById('session-duration-select');
 const settingsError = document.getElementById('settings-error');
 const appVersionEl = document.getElementById('app-version');
@@ -120,7 +123,11 @@ const sidebarDashboardsError = document.getElementById('sidebar-dashboards-error
 
 const ACTIVE_DASHBOARD_KEY = 'logbook_active_dashboard_id';
 
+const ENTRIES_PAGE_SIZE_DEFAULT = 10;
+
 let entries = [];
+let entriesPageSize = ENTRIES_PAGE_SIZE_DEFAULT;
+let entriesVisibleCount = ENTRIES_PAGE_SIZE_DEFAULT;
 let settings = {};
 let partages = [];
 let partagesRecus = [];
@@ -180,6 +187,38 @@ themeSelect.addEventListener('change', async () => {
     settings = { ...settings, theme: previousTheme };
     themeSelect.value = previousTheme;
     applyTheme(previousTheme);
+    settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
+
+entriesPageSizeSelect.addEventListener('change', async () => {
+  settingsError.textContent = '';
+  const previousPageSize = entriesPageSize;
+  const pageSize = Number(entriesPageSizeSelect.value);
+  entriesPageSize = pageSize;
+  setViewerPageSize(pageSize);
+  settings = { ...settings, entriesPageSize: pageSize };
+  try {
+    await saveSettings(settings);
+  } catch (error) {
+    entriesPageSize = previousPageSize;
+    setViewerPageSize(previousPageSize);
+    entriesPageSizeSelect.value = String(previousPageSize);
+    settings = { ...settings, entriesPageSize: previousPageSize };
+    settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
+  }
+});
+
+confirmDashboardDeleteCheckbox.addEventListener('change', async () => {
+  settingsError.textContent = '';
+  const previousValue = settings.confirmDashboardDeleteByName ?? true;
+  const value = confirmDashboardDeleteCheckbox.checked;
+  settings = { ...settings, confirmDashboardDeleteByName: value };
+  try {
+    await saveSettings(settings);
+  } catch (error) {
+    settings = { ...settings, confirmDashboardDeleteByName: previousValue };
+    confirmDashboardDeleteCheckbox.checked = previousValue;
     settingsError.textContent = `Échec de l'enregistrement : ${error.message}`;
   }
 });
@@ -306,6 +345,7 @@ function buildPartageReglesTable() {
   headRow.appendChild(document.createElement('th'));
   for (const niveau of NIVEAUX_ACCES) {
     const th = document.createElement('th');
+    th.scope = 'col';
     th.textContent = niveau;
     headRow.appendChild(th);
   }
@@ -388,12 +428,33 @@ function appendCell(row, text) {
   return td;
 }
 
+let entriesLoadMoreObserver = null;
+
+function getEntriesLoadMoreObserver() {
+  if (!entriesLoadMoreObserver) {
+    entriesLoadMoreObserver = new IntersectionObserver((observedEntries) => {
+      if (observedEntries.some((observed) => observed.isIntersecting)) {
+        entriesVisibleCount += entriesPageSize;
+        renderEntries();
+      }
+    });
+  }
+  return entriesLoadMoreObserver;
+}
+
 function renderEntries() {
   entryTableBody.innerHTML = '';
+  if (entries.length === 0) {
+    renderTableMessage(entryTableBody, 6, 'Aucune entrée. Créez-en une avec « + Nouvelle entrée ».');
+    return;
+  }
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date) || a.titre.localeCompare(b.titre));
-  for (const entry of sorted) {
+  const visible = sorted.slice(0, entriesVisibleCount);
+
+  for (const entry of visible) {
     const row = document.createElement('tr');
     row.dataset.entryId = entry.id;
+    row.tabIndex = 0;
 
     appendCell(row, entry.date);
     appendCell(row, entry.titre ?? '');
@@ -403,6 +464,17 @@ function renderEntries() {
     appendCell(row, previewContenuTexte(entry));
 
     entryTableBody.appendChild(row);
+  }
+
+  const observer = getEntriesLoadMoreObserver();
+  observer.disconnect();
+  if (visible.length < sorted.length) {
+    const sentinelRow = document.createElement('tr');
+    const sentinelCell = document.createElement('td');
+    sentinelCell.colSpan = 6;
+    sentinelRow.appendChild(sentinelCell);
+    entryTableBody.appendChild(sentinelRow);
+    observer.observe(sentinelRow);
   }
 }
 
@@ -562,6 +634,10 @@ async function deletePartage(partage) {
 
 function renderPartages() {
   partageList.innerHTML = '';
+  if (partageViewPartages.length === 0) {
+    renderListMessage(partageList, 'Aucun partage. Créez-en un ci-dessus.');
+    return;
+  }
   for (const partage of partageViewPartages) {
     const li = document.createElement('li');
 
@@ -609,6 +685,7 @@ function renderPartages() {
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
+    deleteButton.className = 'button-danger';
     deleteButton.textContent = 'Supprimer';
     deleteButton.addEventListener('click', () => deletePartage(partage));
     actions.appendChild(deleteButton);
@@ -684,6 +761,10 @@ async function retirerPartageRecu(partageRecu) {
 
 function renderPartagesRecus() {
   partagesRecusList.innerHTML = '';
+  if (partagesRecus.length === 0) {
+    renderListMessage(partagesRecusList, 'Aucun accès reçu pour le moment.');
+    return;
+  }
   for (const partageRecu of partagesRecus) {
     const li = document.createElement('li');
 
@@ -835,6 +916,10 @@ loadModelesDefaut()
 
 function renderModeles() {
   modeleList.innerHTML = '';
+  if (modeles.length === 0) {
+    renderListMessage(modeleList, 'Aucun modèle. Créez-en un ci-dessus.');
+    return;
+  }
   for (const modele of modeles) {
     const li = document.createElement('li');
 
@@ -853,6 +938,7 @@ function renderModeles() {
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
+    deleteButton.className = 'button-danger';
     deleteButton.textContent = 'Supprimer';
     deleteButton.addEventListener('click', () => deleteModele(modele));
     actions.appendChild(deleteButton);
@@ -1071,6 +1157,9 @@ initSidebar({
   onSelectDashboard: switchDashboard,
   onCreateDashboard: createDashboard,
   onRenameDashboard: renameDashboard,
+  onArchiveDashboard: archiveDashboard,
+  onUnarchiveDashboard: unarchiveDashboard,
+  onDeleteDashboard: deleteDashboard,
 });
 
 modeleNewButton.addEventListener('click', () => {
@@ -1163,6 +1252,15 @@ entryTableBody.addEventListener('click', (event) => {
   if (entry) startEditEntry(entry);
 });
 
+entryTableBody.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const row = event.target.closest('tr');
+  const entry = row && entries.find((e) => e.id === row.dataset.entryId);
+  if (!entry) return;
+  event.preventDefault();
+  startEditEntry(entry);
+});
+
 entryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   entryError.textContent = '';
@@ -1220,9 +1318,13 @@ entryDeleteButton.addEventListener('click', async () => {
   if (!window.confirm('Supprimer définitivement cette entrée ?')) return;
   entryError.textContent = '';
   const previousEntries = entries;
+  const deleted = entries.find((e) => e.id === editingEntryId);
   entries = entries.filter((e) => e.id !== editingEntryId);
   try {
     await saveEntries(entries);
+    deleted.champsSchema.fields
+      .filter((f) => f.type === 'photo' && deleted.champsPersonnalises[f.id])
+      .forEach((f) => deletePhoto(deleted.champsPersonnalises[f.id]).catch(() => {}));
     await syncPartages();
     renderEntries();
     stopEditEntry();
@@ -1306,21 +1408,31 @@ partageForm.addEventListener('submit', async (event) => {
   }
 });
 
-function renderLoading(list) {
+function renderListMessage(list, message) {
   list.innerHTML = '';
   const li = document.createElement('li');
-  li.textContent = 'Chargement…';
+  li.className = 'list-message';
+  li.textContent = message;
   list.appendChild(li);
 }
 
-function renderTableLoading(tbody, colspan) {
+function renderLoading(list) {
+  renderListMessage(list, 'Chargement…');
+}
+
+function renderTableMessage(tbody, colspan, message) {
   tbody.innerHTML = '';
   const row = document.createElement('tr');
+  row.className = 'table-message';
   const td = document.createElement('td');
   td.colSpan = colspan;
-  td.textContent = 'Chargement…';
+  td.textContent = message;
   row.appendChild(td);
   tbody.appendChild(row);
+}
+
+function renderTableLoading(tbody, colspan) {
+  renderTableMessage(tbody, colspan, 'Chargement…');
 }
 
 // Charge entries/settings/partages/partagesRecus/modeles pour le dashboard actif
@@ -1337,54 +1449,83 @@ async function loadAccountData() {
   renderLoading(partagesRecusList);
   renderLoading(modeleList);
 
-  try {
-    settings = await loadSettings();
-  } catch (error) {
-    settings = {};
-    settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
-  }
-  themeSelect.value = settings.theme ?? DEFAULT_THEME;
-  applyTheme(settings.theme ?? DEFAULT_THEME);
+  const loadSettingsTask = (async () => {
+    try {
+      settings = await loadSettings();
+    } catch (error) {
+      settings = {};
+      settingsError.textContent = `Échec du chargement des préférences : ${error.message}`;
+    }
+    themeSelect.value = settings.theme ?? DEFAULT_THEME;
+    applyTheme(settings.theme ?? DEFAULT_THEME);
+    entriesPageSize = settings.entriesPageSize ?? ENTRIES_PAGE_SIZE_DEFAULT;
+    setViewerPageSize(entriesPageSize);
+    entriesPageSizeSelect.value = String(entriesPageSize);
+    confirmDashboardDeleteCheckbox.checked = settings.confirmDashboardDeleteByName ?? true;
+  })();
 
-  try {
-    entries = (await loadEntries()).map(migrateEntryContenu);
-  } catch (error) {
-    entries = [];
-    entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
-  }
-  renderEntries();
+  const loadEntriesTask = (async () => {
+    try {
+      entries = (await loadEntries()).map(migrateEntryContenu);
+    } catch (error) {
+      entries = [];
+      entryError.textContent = `Échec du chargement des entrées : ${error.message}`;
+    }
+    entriesVisibleCount = entriesPageSize;
+    renderEntries();
+  })();
 
-  try {
-    partages = await loadPartages();
-  } catch (error) {
-    partages = [];
-    partageError.textContent = `Échec du chargement des partages : ${error.message}`;
-  }
-  partageViewDashboardId = activeDashboardId;
-  partageViewPartages = partages;
-  try {
-    ownerName = await getOwnerDisplayName();
-  } catch {
-    ownerName = null;
-  }
-  renderPartages();
+  const loadPartagesTask = (async () => {
+    try {
+      partages = await loadPartages();
+    } catch (error) {
+      partages = [];
+      partageError.textContent = `Échec du chargement des partages : ${error.message}`;
+    }
+    partageViewDashboardId = activeDashboardId;
+    partageViewPartages = partages;
+    renderPartages();
+  })();
 
-  try {
-    partagesRecus = await loadPartagesRecus();
-  } catch (error) {
-    partagesRecus = [];
-    partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
-  }
-  renderPartagesRecus();
+  const loadOwnerNameTask = (async () => {
+    try {
+      ownerName = await getOwnerDisplayName();
+    } catch {
+      ownerName = null;
+    }
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  })();
 
-  try {
-    modeles = (await loadModeles()).map(migrateModeleContenu);
-  } catch (error) {
-    modeles = [];
-    modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
-  }
-  renderModeles();
-  renderEntryNewMenu();
+  const loadPartagesRecusTask = (async () => {
+    try {
+      partagesRecus = await loadPartagesRecus();
+    } catch (error) {
+      partagesRecus = [];
+      partagesRecusError.textContent = `Échec du chargement des partages reçus : ${error.message}`;
+    }
+    renderPartagesRecus();
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  })();
+
+  const loadModelesTask = (async () => {
+    try {
+      modeles = (await loadModeles()).map(migrateModeleContenu);
+    } catch (error) {
+      modeles = [];
+      modeleError.textContent = `Échec du chargement des modèles : ${error.message}`;
+    }
+    renderModeles();
+    renderEntryNewMenu();
+  })();
+
+  await Promise.all([
+    loadEntriesTask,
+    loadSettingsTask,
+    loadPartagesTask,
+    loadOwnerNameTask,
+    loadPartagesRecusTask,
+    loadModelesTask,
+  ]);
 }
 
 let dashboardSwitchInProgress = false;
@@ -1472,6 +1613,76 @@ async function renameDashboard(dashboardId) {
   }
 }
 
+// Archiver ne touche à aucune donnée Drive : juste un drapeau sur le registre qui
+// sort le tableau de la liste active (voir sidebar.js) sans rien déplacer ni dupliquer.
+async function archiveDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  if (!window.confirm(`Archiver « ${dashboard.nom} » ? Il restera consultable dans les tableaux archivés.`)) return;
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  dashboards = dashboards.map((d) => (d.id === dashboardId ? { ...d, archive: true } : d));
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  try {
+    await saveDashboards(dashboards);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de l'archivage : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
+async function unarchiveDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  dashboards = dashboards.map((d) => (d.id === dashboardId ? { ...d, archive: false } : d));
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  try {
+    await saveDashboards(dashboards);
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de la désarchivage : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
+// Suppression définitive : retire le tableau du registre puis supprime son dossier
+// Drive (DELETE sur un dossier non vide efface aussi son contenu en cascade côté API).
+async function deleteDashboard(dashboardId) {
+  const dashboard = dashboards.find((d) => d.id === dashboardId);
+  if (!dashboard) return;
+  if (dashboards.length === 1) {
+    sidebarDashboardsError.textContent = 'Impossible de supprimer le dernier tableau de bord.';
+    return;
+  }
+  if (settings.confirmDashboardDeleteByName ?? true) {
+    const saisie = window.prompt(
+      `Suppression définitive et irréversible de « ${dashboard.nom} » et de toutes ses entrées.\nRetape le nom du tableau de bord pour confirmer :`,
+    );
+    if (saisie !== dashboard.nom) return;
+  } else if (
+    !window.confirm(`Supprimer définitivement « ${dashboard.nom} » et toutes ses entrées ? Cette action est irréversible.`)
+  ) {
+    return;
+  }
+  sidebarDashboardsError.textContent = '';
+  const previousDashboards = dashboards;
+  const wasActive = dashboardId === activeDashboardId;
+  dashboards = dashboards.filter((d) => d.id !== dashboardId);
+  try {
+    await saveDashboards(dashboards);
+    if (dashboard.dossierId) await deleteSharedFile(dashboard.dossierId);
+    if (wasActive) await switchDashboard(dashboards[0].id);
+    else renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de la suppression : ${error.message}`;
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  }
+}
+
 onAuthChange(async (token) => {
   const connected = Boolean(token);
   authSection.hidden = connected;
@@ -1493,10 +1704,6 @@ onAuthChange(async (token) => {
     // loadAccountData démarre — ça donnait une impression de chargement incohérent.
     renderMainView();
     renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-    renderTableLoading(entryTableBody, 6);
-    renderLoading(partageList);
-    renderLoading(partagesRecusList);
-    renderLoading(modeleList);
 
     try {
       dashboards = await loadDashboards();
@@ -1528,6 +1735,9 @@ onAuthChange(async (token) => {
     mainView = 'entries';
     themeSelect.value = DEFAULT_THEME;
     applyTheme(DEFAULT_THEME);
+    entriesPageSize = ENTRIES_PAGE_SIZE_DEFAULT;
+    setViewerPageSize(ENTRIES_PAGE_SIZE_DEFAULT);
+    entriesPageSizeSelect.value = String(ENTRIES_PAGE_SIZE_DEFAULT);
     renderEntries();
     renderPartages();
     renderPartagesRecus();

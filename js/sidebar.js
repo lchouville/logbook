@@ -8,6 +8,8 @@ const sidebarProfileButton = document.getElementById('sidebar-profile-button');
 const sidebarProfileMenu = document.getElementById('sidebar-profile-menu');
 const sidebarSettingsButton = document.getElementById('sidebar-settings-button');
 const sidebarDashboards = document.getElementById('sidebar-dashboards');
+const sidebarDashboardsArchivedToggle = document.getElementById('sidebar-dashboards-archived-toggle');
+const sidebarDashboardsArchived = document.getElementById('sidebar-dashboards-archived');
 const sidebarJournaux = document.getElementById('sidebar-journaux');
 const sidebarJournauxPlus = document.getElementById('sidebar-journaux-plus');
 const sidebarPartageButton = document.getElementById('sidebar-partage-button');
@@ -73,6 +75,9 @@ export function initSidebar({
   onSelectDashboard,
   onCreateDashboard,
   onRenameDashboard,
+  onArchiveDashboard,
+  onUnarchiveDashboard,
+  onDeleteDashboard,
 }) {
   sidebarSettingsButton.addEventListener('click', onOpenSettings);
   sidebarPartageButton.addEventListener('click', onOpenPartages);
@@ -90,28 +95,90 @@ export function initSidebar({
       onCreateDashboard();
       return;
     }
+    if (button.dataset.action === 'archive') {
+      onArchiveDashboard(button.dataset.dashboardId);
+      return;
+    }
+    if (button.dataset.action === 'delete') {
+      onDeleteDashboard(button.dataset.dashboardId);
+      return;
+    }
     if (button.dataset.dashboardId) onSelectDashboard(button.dataset.dashboardId);
   });
   sidebarDashboards.addEventListener('dblclick', (event) => {
-    const button = event.target.closest('button[data-dashboard-id]');
+    const button = event.target.closest('button[data-dashboard-id]:not([data-action])');
     if (button) onRenameDashboard(button.dataset.dashboardId);
+  });
+  sidebarDashboardsArchivedToggle.addEventListener('click', () => {
+    sidebarDashboardsArchived.hidden = !sidebarDashboardsArchived.hidden;
+  });
+  sidebarDashboardsArchived.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    if (button.dataset.action === 'unarchive') {
+      onUnarchiveDashboard(button.dataset.dashboardId);
+      return;
+    }
+    if (button.dataset.action === 'delete') {
+      onDeleteDashboard(button.dataset.dashboardId);
+      return;
+    }
+    if (button.dataset.dashboardId) onSelectDashboard(button.dataset.dashboardId);
   });
 }
 
+const AVATAR_COLOR_COUNT = 6;
+
+function avatarColorClass(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return `avatar-color-${Math.abs(hash) % AVATAR_COLOR_COUNT}`;
+}
+
 export function renderSidebar({ ownerName, partagesRecus, activeJournalId, dashboards, activeDashboardId }) {
-  sidebarOwnerName.textContent = ownerName ?? 'Logbook';
-  sidebarOwnerAvatar.textContent = (ownerName ?? 'L').trim().charAt(0).toUpperCase();
+  const name = ownerName ?? 'Logbook';
+  sidebarOwnerName.textContent = name;
+  sidebarOwnerAvatar.textContent = name.trim().charAt(0).toUpperCase();
+  sidebarOwnerAvatar.className = avatarColorClass(name);
+
+  const activeDashboards = (dashboards ?? []).filter((d) => !d.archive);
+  const archivedDashboards = (dashboards ?? []).filter((d) => d.archive);
 
   sidebarDashboards.innerHTML = '';
-  for (const dashboard of dashboards ?? []) {
+  for (const dashboard of activeDashboards) {
     const li = document.createElement('li');
+    li.className = 'sidebar-dashboard-item';
     const button = document.createElement('button');
     button.type = 'button';
+    button.className = 'sidebar-dashboard-name';
     button.textContent = dashboard.nom;
     button.dataset.dashboardId = dashboard.id;
     button.title = 'Double-clic pour renommer';
     button.setAttribute('aria-current', dashboard.id === activeDashboardId ? 'true' : 'false');
     li.appendChild(button);
+
+    const actions = document.createElement('span');
+    actions.className = 'sidebar-dashboard-actions';
+    const archiveButton = document.createElement('button');
+    archiveButton.type = 'button';
+    archiveButton.className = 'sidebar-dashboard-action';
+    archiveButton.dataset.action = 'archive';
+    archiveButton.dataset.dashboardId = dashboard.id;
+    archiveButton.title = 'Archiver ce tableau de bord';
+    archiveButton.setAttribute('aria-label', `Archiver ${dashboard.nom}`);
+    archiveButton.textContent = '📦';
+    actions.appendChild(archiveButton);
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'sidebar-dashboard-action';
+    deleteButton.dataset.action = 'delete';
+    deleteButton.dataset.dashboardId = dashboard.id;
+    deleteButton.title = 'Supprimer définitivement ce tableau de bord';
+    deleteButton.setAttribute('aria-label', `Supprimer ${dashboard.nom}`);
+    deleteButton.textContent = '🗑';
+    actions.appendChild(deleteButton);
+    li.appendChild(actions);
+
     sidebarDashboards.appendChild(li);
   }
   const createLi = document.createElement('li');
@@ -121,6 +188,45 @@ export function renderSidebar({ ownerName, partagesRecus, activeJournalId, dashb
   createButton.textContent = '+ Nouveau tableau de bord';
   createLi.appendChild(createButton);
   sidebarDashboards.appendChild(createLi);
+
+  sidebarDashboardsArchivedToggle.hidden = archivedDashboards.length === 0;
+  if (archivedDashboards.length === 0) sidebarDashboardsArchived.hidden = true;
+  sidebarDashboardsArchived.innerHTML = '';
+  for (const dashboard of archivedDashboards) {
+    const li = document.createElement('li');
+    li.className = 'sidebar-dashboard-item';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sidebar-dashboard-name';
+    button.textContent = dashboard.nom;
+    button.dataset.dashboardId = dashboard.id;
+    button.setAttribute('aria-current', dashboard.id === activeDashboardId ? 'true' : 'false');
+    li.appendChild(button);
+
+    const actions = document.createElement('span');
+    actions.className = 'sidebar-dashboard-actions';
+    const unarchiveButton = document.createElement('button');
+    unarchiveButton.type = 'button';
+    unarchiveButton.className = 'sidebar-dashboard-action';
+    unarchiveButton.dataset.action = 'unarchive';
+    unarchiveButton.dataset.dashboardId = dashboard.id;
+    unarchiveButton.title = 'Désarchiver ce tableau de bord';
+    unarchiveButton.setAttribute('aria-label', `Désarchiver ${dashboard.nom}`);
+    unarchiveButton.textContent = '↩';
+    actions.appendChild(unarchiveButton);
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'sidebar-dashboard-action';
+    deleteButton.dataset.action = 'delete';
+    deleteButton.dataset.dashboardId = dashboard.id;
+    deleteButton.title = 'Supprimer définitivement ce tableau de bord';
+    deleteButton.setAttribute('aria-label', `Supprimer ${dashboard.nom}`);
+    deleteButton.textContent = '🗑';
+    actions.appendChild(deleteButton);
+    li.appendChild(actions);
+
+    sidebarDashboardsArchived.appendChild(li);
+  }
 
   sidebarJournaux.innerHTML = '';
 

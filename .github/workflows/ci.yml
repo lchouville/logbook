@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [develop, release, gh-page]
 
+permissions:
+  contents: read
+
 jobs:
   html-validate:
     runs-on: ubuntu-latest
@@ -13,3 +16,15 @@ jobs:
         run: pip install html5validator
       - name: Validate HTML
         run: html5validator --root . --match '*.html'
+
+  no-tracking-files:
+    if: github.base_ref == 'gh-page'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse visual-ref/ and REPRISE.md on gh-page
+        run: |
+          if [ -d visual-ref ] || [ -f REPRISE.md ]; then
+            echo "visual-ref/ et REPRISE.md sont des fichiers de suivi internes, jamais publiés sur gh-page." >&2
+            exit 1
+          fi
