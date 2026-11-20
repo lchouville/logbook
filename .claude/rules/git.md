@@ -31,6 +31,11 @@
 - Avant une PR : lint et build passent, branche à jour avec sa base.
 - Supprimer la branche après fusion.
 
+## Enchaînement de tâches non liées
+- Chaque tâche (`feature/`, `fix/`, `hotfix/`) a sa propre branche créée depuis `develop` à jour (`git pull` avant de créer), jamais depuis une autre branche de travail en cours.
+- Pour passer d'une tâche à une autre sans les mélanger : committer et pousser l'état courant (même partiel, avec une PR ouverte si elle est prête) avant de changer de branche — jamais de changement de branche avec des modifications non sauvegardées.
+- Chaque branche est fusionnée dans `develop` dès qu'elle est terminée et validée (CI verte + accord), indépendamment de l'avancement des autres tâches en cours ; pas besoin d'attendre que tout soit fini pour fusionner la première.
+
 ## Interdits (sans accord explicite)
 - `git push --force` (sauf `--force-with-lease` sur sa propre branche de travail), `git reset --hard`, réécriture d'historique publié.
 - Modifier la config git ou contourner les hooks (`--no-verify`).
