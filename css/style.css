@@ -487,6 +487,59 @@ form button[type="submit"] {
   font-size: 0.8125rem;
 }
 
+.sidebar-dashboard-item {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.sidebar-dashboard-name {
+  flex: 1;
+}
+
+.sidebar-dashboard-actions {
+  display: flex;
+  gap: 0.125rem;
+  visibility: hidden;
+}
+
+.sidebar-dashboard-item:hover .sidebar-dashboard-actions,
+.sidebar-dashboard-item:focus-within .sidebar-dashboard-actions {
+  visibility: visible;
+}
+
+.sidebar-dashboard-action {
+  display: block;
+  width: auto;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+#sidebar-dashboards-archived-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  font-size: 0.8125rem;
+  color: var(--color-fg-secondary);
+  margin: 0 0 0.5rem;
+}
+
+#sidebar-dashboards-archived-toggle:hover {
+  background: var(--color-bg-hover);
+}
+
+#sidebar-dashboards-archived {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 #sidebar-dashboards button,
 #sidebar-journaux button,
 #sidebar-journaux-plus,
@@ -819,6 +872,21 @@ form button[type="submit"] {
   flex-shrink: 0;
   font-size: 0.8125rem;
   padding: 0.25rem 0.5rem;
+}
+
+.champ-photo {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.champ-photo-preview {
+  max-width: 4rem;
+  max-height: 4rem;
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 .drag-handle {

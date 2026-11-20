@@ -36,6 +36,8 @@
       </div>
       <ul id="sidebar-dashboards"></ul>
       <p id="sidebar-dashboards-error" role="alert"></p>
+      <button id="sidebar-dashboards-archived-toggle" type="button" hidden>Voir les tableaux archivés</button>
+      <ul id="sidebar-dashboards-archived" hidden></ul>
       <ul id="sidebar-journaux"></ul>
       <button id="sidebar-journaux-plus" type="button" hidden>Voir tout</button>
       <button id="sidebar-partage-button" type="button">Partage</button>
@@ -95,6 +97,7 @@
             <option value="date">Date</option>
             <option value="select">Liste</option>
             <option value="case">Case à cocher</option>
+            <option value="photo">Photo</option>
           </select>
 
           <label for="schema-field-options">Options (séparées par des virgules)</label>
@@ -157,6 +160,11 @@
           <option value="50">50</option>
           <option value="100">100</option>
         </select>
+
+        <label for="confirm-dashboard-delete-checkbox">
+          <input id="confirm-dashboard-delete-checkbox" type="checkbox">
+          Confirmer la suppression d'un tableau de bord en retapant son nom
+        </label>
 
         <p id="settings-error" role="alert"></p>
         <p><a href="confidentialite.html">Politique de confidentialité</a></p>
