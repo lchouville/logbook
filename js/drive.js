@@ -1,6 +1,7 @@
 import { getAccessToken, refreshAccessToken } from './auth.js';
 
 const APP_FOLDER_NAME = 'Application';
+const LOGBOOK_FOLDER_NAME = 'Logbook';
 const DATA_FOLDER_NAME = 'logbook';
 const PARTAGES_FOLDER_NAME = 'shares';
 const LEGACY_PARTAGES_FOLDER_NAME = 'partages';
@@ -15,6 +16,7 @@ const LEGACY_PARTAGES_RECUS_FILE_NAME = 'logbook-partages-recus.json';
 const PARTAGES_RECUS_FOLDER_NAME = 'received-shares';
 const LEGACY_PARTAGES_RECUS_FOLDER_NAME = 'partages-recus';
 const PHOTOS_FOLDER_NAME = 'photos';
+const INTEGRATION_FOLDER_NAME = 'entries_to_import';
 const DASHBOARDS_FILE_NAME = 'logbook-dashboards.json';
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 const SHORTCUT_MIME_TYPE = 'application/vnd.google-apps.shortcut';
@@ -24,10 +26,10 @@ const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 const DRIVE_ABOUT_URL = 'https://www.googleapis.com/drive/v3/about';
 
 let folderIdCache = null;
+let folderIdPromise = null;
 let partagesFolderIdCache = null;
 let partagesRecusFolderIdCache = null;
 let photosFolderIdCache = null;
-let appFolderIdCache = null;
 let activeDashboardId = 'default';
 const fileIdCache = new Map();
 
@@ -36,6 +38,7 @@ const fileIdCache = new Map();
 export function setActiveDashboard(dashboardId) {
   activeDashboardId = dashboardId;
   folderIdCache = null;
+  folderIdPromise = null;
   partagesFolderIdCache = null;
   partagesRecusFolderIdCache = null;
   photosFolderIdCache = null;
@@ -111,10 +114,12 @@ async function findOrCreateFolder(name, parentId, legacyName) {
   return createFolder(name, parentId);
 }
 
+// Toutes les données de l'app (dashboards, modèles, entrées, entries_to_import)
+// vivent dans le dossier Logbook connecté une fois par l'utilisateur via le
+// Picker (cf connectLogbookFolder plus bas) — jamais dans un dossier que l'app
+// aurait créé elle-même ailleurs sur le Drive.
 async function getAppFolderId() {
-  if (appFolderIdCache) return appFolderIdCache;
-  appFolderIdCache = await findOrCreateFolder(APP_FOLDER_NAME, null);
-  return appFolderIdCache;
+  return getLogbookFolderId();
 }
 
 export async function loadDashboards() {
@@ -137,29 +142,67 @@ export async function createDashboardFolder(dossierNom) {
   return findOrCreateFolder(dossierNom, await getAppFolderId());
 }
 
+// Convention de nommage des dossiers de dashboard : "logbook-default" pour le
+// dashboard par défaut, "logbook-<nom>" (espaces remplacés par "_") pour les
+// autres — appliquée aussi bien à la création (cf createDashboard, app.js) qu'en
+// migration à la volée pour les dashboards déjà résolus sous un ancien nom
+// ("logbook" ou "logbook-<uuid>").
+export function expectedDossierNom(dashboard) {
+  const base = dashboard.id === 'default' ? 'default' : dashboard.nom.trim().replace(/\s+/g, '_');
+  return `logbook-${base}`;
+}
+
 // dashboardId par défaut = le dashboard actif ; un appelant peut passer un autre id
 // (ex. le sélecteur de tableau dans le partage) sans toucher au dashboard actif ni à
 // son cache, puisque seul le résultat pour activeDashboardId est mis en cache ici.
+// loadAccountData (app.js) déclenche plusieurs chargements en parallèle (entrées,
+// partages, accès reçus...) qui dépendent tous de ce dossier dès le premier accès
+// à un dashboard sans dossierId connu : sans partage de la promesse en cours, ils
+// lancent chacun leur propre recherche-puis-création en même temps (aucun n'a
+// encore le résultat des autres), créant plusieurs dossiers en double.
 async function getDataFolderId(dashboardId = activeDashboardId) {
   if (dashboardId === activeDashboardId && folderIdCache) return folderIdCache;
-  const appFolderId = await getAppFolderId();
-  const dashboards = await loadDashboards();
-  const dashboard = dashboards.find((d) => d.id === dashboardId);
-  if (!dashboard) throw new Error('Dashboard inconnu : ' + dashboardId);
-  // dossierId est déjà connu depuis la création : l'utiliser directement évite de
-  // re-chercher le dossier par nom juste après sa création, requête sujette au délai
-  // d'indexation de la recherche Drive (le dossier peut ne pas encore être trouvable).
-  // Les anciens registres (dashboard "default" migré) n'ont pas encore de dossierId :
-  // on le résout une fois par nom puis on le persiste, pour que tous les dashboards
-  // soient ensuite stockés de la même façon.
-  let folderId = dashboard.dossierId;
-  if (!folderId) {
-    folderId = await findOrCreateFolder(dashboard.dossierNom ?? DATA_FOLDER_NAME, appFolderId);
-    dashboard.dossierId = folderId;
-    await saveJsonFile(DASHBOARDS_FILE_NAME, dashboards, appFolderId);
+  if (dashboardId === activeDashboardId && folderIdPromise) return folderIdPromise;
+
+  const resolving = (async () => {
+    const appFolderId = await getAppFolderId();
+    const dashboards = await loadDashboards();
+    const dashboard = dashboards.find((d) => d.id === dashboardId);
+    if (!dashboard) throw new Error('Dashboard inconnu : ' + dashboardId);
+    // dossierId est déjà connu depuis la création : l'utiliser directement évite de
+    // re-chercher le dossier par nom juste après sa création, requête sujette au délai
+    // d'indexation de la recherche Drive (le dossier peut ne pas encore être trouvable).
+    // Les anciens registres (dashboard "default" migré) n'ont pas encore de dossierId :
+    // on le résout une fois par nom puis on le persiste, pour que tous les dashboards
+    // soient ensuite stockés de la même façon.
+    let folderId = dashboard.dossierId;
+    if (!folderId) {
+      folderId = await findOrCreateFolder(dashboard.dossierNom ?? DATA_FOLDER_NAME, appFolderId);
+      dashboard.dossierId = folderId;
+      await saveJsonFile(DASHBOARDS_FILE_NAME, dashboards, appFolderId);
+    }
+
+    // Migration à la volée vers la convention "logbook-<nom>" ("logbook-default"
+    // pour le dashboard par défaut) : couvre aussi bien l'ancien nom "logbook" que
+    // l'ancien "logbook-<uuid>" utilisé à la création avant cette convention.
+    const expected = expectedDossierNom(dashboard);
+    if (dashboard.dossierNom !== expected) {
+      await renameSharedFile(folderId, expected);
+      dashboard.dossierNom = expected;
+      await saveJsonFile(DASHBOARDS_FILE_NAME, dashboards, appFolderId);
+    }
+
+    return folderId;
+  })();
+
+  if (dashboardId === activeDashboardId) folderIdPromise = resolving;
+  try {
+    const folderId = await resolving;
+    if (dashboardId === activeDashboardId) folderIdCache = folderId;
+    return folderId;
+  } finally {
+    if (dashboardId === activeDashboardId) folderIdPromise = null;
   }
-  if (dashboardId === activeDashboardId) folderIdCache = folderId;
-  return folderId;
 }
 
 async function getPartagesFolderId(dashboardId = activeDashboardId) {
@@ -207,6 +250,105 @@ export async function fetchPhotoBlob(fileId) {
 export async function deletePhoto(fileId) {
   const response = await driveFetch(`${DRIVE_FILES_URL}/${fileId}`, { method: 'DELETE' });
   if (!response.ok && response.status !== 404) throw new Error(`Suppression de la photo Drive : ${await describeError(response)}`);
+}
+
+// Dossier "Logbook" de l'utilisateur : racine de toutes les données de l'app
+// (dashboards, modèles, entrées, entries_to_import), potentiellement pas créé
+// par l'app elle-même. Son id est choisi une fois par l'utilisateur via le
+// Picker (cf connectLogbookFolder) et persisté en local (pas sur Drive : on ne
+// peut pas stocker ce pointeur DANS le dossier qu'il désigne avant de le
+// connaître).
+const LOGBOOK_FOLDER_ID_KEY = 'logbook_drive_folder_id';
+let logbookFolderIdCache = null;
+export const LOGBOOK_FOLDER_NOT_CONNECTED = 'LOGBOOK_FOLDER_NOT_CONNECTED';
+
+export async function connectLogbookFolder(folderId) {
+  localStorage.setItem(LOGBOOK_FOLDER_ID_KEY, folderId);
+  logbookFolderIdCache = folderId;
+}
+
+// Recherche Application/Logbook par nom (ne peut trouver que ce que l'app a
+// elle-même déjà créé ou auquel elle a déjà accès — scope drive.file oblige) :
+// sert uniquement à décider quelle action proposer dans la popup de connexion
+// (Connecter si trouvé, Créer sinon), pas à se connecter automatiquement — un
+// faux négatif (dossier existant mais jamais vu par l'app) ne doit pas bloquer
+// l'utilisateur, juste lui laisser l'option "Créer".
+export async function probeLogbookFolder() {
+  const appFolderId = await findFolder(APP_FOLDER_NAME, null);
+  if (!appFolderId) return { found: false, appFolderId: null };
+  const logbookFolderId = await findFolder(LOGBOOK_FOLDER_NAME, appFolderId);
+  return { found: Boolean(logbookFolderId), appFolderId };
+}
+
+// Premier usage, aucun dossier Logbook existant à connecter : l'app crée et
+// connecte elle-même Application/Logbook (toujours visible pour elle puisque
+// créé par son propre token, pas besoin de passer par le Picker).
+export async function createLogbookFolder() {
+  const rootAppFolderId = await findOrCreateFolder(APP_FOLDER_NAME, null);
+  const logbookFolderId = await findOrCreateFolder(LOGBOOK_FOLDER_NAME, rootAppFolderId);
+  await connectLogbookFolder(logbookFolderId);
+  return logbookFolderId;
+}
+
+export function isLogbookFolderConnected() {
+  return Boolean(localStorage.getItem(LOGBOOK_FOLDER_ID_KEY));
+}
+
+// Vérifié une seule fois par session (pas à chaque appel) : une suppression du
+// dossier en cours de session ne sera détectée qu'au prochain chargement de
+// page, mais évite un aller-retour Drive supplémentaire à chaque résolution.
+let logbookFolderValidated = false;
+
+function disconnectLogbookFolder() {
+  localStorage.removeItem(LOGBOOK_FOLDER_ID_KEY);
+  logbookFolderIdCache = null;
+  logbookFolderValidated = false;
+}
+
+async function getLogbookFolderId() {
+  if (logbookFolderIdCache && logbookFolderValidated) return logbookFolderIdCache;
+  const stored = logbookFolderIdCache ?? localStorage.getItem(LOGBOOK_FOLDER_ID_KEY);
+  if (!stored) throw new Error(LOGBOOK_FOLDER_NOT_CONNECTED);
+
+  // Le dossier a pu être supprimé/déplacé hors d'atteinte depuis Drive directement :
+  // sans cette vérification, l'app resterait "connectée" à un id mort et échouerait
+  // sur chaque appel sans jamais réafficher la popup de connexion.
+  const params = new URLSearchParams({ fields: 'id,trashed' });
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${stored}?${params}`);
+  const data = response.ok ? await response.json() : null;
+  if (!data || data.trashed) {
+    disconnectLogbookFolder();
+    throw new Error(LOGBOOK_FOLDER_NOT_CONNECTED);
+  }
+
+  logbookFolderIdCache = stored;
+  logbookFolderValidated = true;
+  return logbookFolderIdCache;
+}
+
+async function getIntegrationFolderId() {
+  return findOrCreateFolder(INTEGRATION_FOLDER_NAME, await getAppFolderId());
+}
+
+export async function listIntegrationFiles() {
+  const params = new URLSearchParams({
+    q: `trashed=false and '${await getIntegrationFolderId()}' in parents`,
+    spaces: 'drive',
+    fields: 'files(id,name)',
+    orderBy: 'name',
+  });
+  const response = await driveFetch(`${DRIVE_FILES_URL}?${params}`);
+  if (!response.ok) throw new Error(`Liste des entrées à intégrer : ${await describeError(response)}`);
+  const data = await response.json();
+  return data.files ?? [];
+}
+
+export async function loadIntegrationFile(fileId) {
+  return loadSharedFile(fileId);
+}
+
+export async function deleteIntegrationFile(fileId) {
+  return deleteSharedFile(fileId);
 }
 
 async function migrateLegacyFile(folderId) {
@@ -318,8 +460,8 @@ export async function loadEntries(dashboardId) {
   return loadJsonFile(DATA_FILE_NAME, [], await getDataFolderId(dashboardId), dashboardId);
 }
 
-export async function saveEntries(entries) {
-  return saveJsonFile(DATA_FILE_NAME, entries, await getDataFolderId());
+export async function saveEntries(entries, dashboardId) {
+  return saveJsonFile(DATA_FILE_NAME, entries, await getDataFolderId(dashboardId));
 }
 
 export async function loadSettings() {

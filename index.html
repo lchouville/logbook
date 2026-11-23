@@ -41,19 +41,34 @@
       <ul id="sidebar-journaux"></ul>
       <button id="sidebar-journaux-plus" type="button" hidden>Voir tout</button>
       <button id="sidebar-partage-button" type="button">Partage</button>
+      <button id="sidebar-integration-button" type="button">Intégration</button>
       <button id="sidebar-modeles-button" type="button">Modèles</button>
     </nav>
     <main id="main-content" tabindex="-1">
       <section id="entries">
         <div id="entries-header">
           <h2>Entrées</h2>
-          <div id="entry-new-wrapper">
-            <button id="entry-new-button" type="button" aria-haspopup="true" aria-expanded="false">+ Nouvelle entrée</button>
-            <div id="entry-new-menu" hidden>
-              <button type="button" data-modele-id="">Entrée vierge</button>
+          <div id="entries-header-actions">
+            <button id="dashboards-export-button" type="button">Exporter les tableaux de bord</button>
+            <button id="dashboards-import-button" type="button">Importer les tableaux de bord</button>
+            <input id="dashboards-import-file-input" type="file" accept="application/json" hidden>
+            <div id="entry-import-wrapper">
+              <button id="entry-import-button" type="button" aria-haspopup="true" aria-expanded="false">Importer</button>
+              <div id="entry-import-menu" hidden>
+                <button id="entry-import-upload-button" type="button">Uploader un fichier</button>
+                <button id="entry-import-drive-button" type="button">Depuis le Drive</button>
+                <input id="entry-import-file-input" type="file" accept="application/json" hidden>
+              </div>
+            </div>
+            <div id="entry-new-wrapper">
+              <button id="entry-new-button" type="button" aria-haspopup="true" aria-expanded="false">+ Nouvelle entrée</button>
+              <div id="entry-new-menu" hidden>
+                <button type="button" data-modele-id="">Entrée vierge</button>
+              </div>
             </div>
           </div>
         </div>
+        <p id="entry-import-error" role="alert"></p>
         <div class="table-wrapper" id="entry-table-wrapper">
           <table id="entry-table">
             <thead>
@@ -71,9 +86,19 @@
         </div>
       </section>
 
+      <section id="integration" hidden>
+        <h2>Intégration</h2>
+        <p id="integration-count"></p>
+        <p id="integration-error" role="alert"></p>
+        <ul id="integration-list" class="card-list"></ul>
+      </section>
+
       <section id="modeles" hidden>
         <div id="modeles-header">
           <h2>Modèles</h2>
+          <button id="modeles-export-button" type="button">Exporter les modèles</button>
+          <button id="modeles-import-button" type="button">Importer les modèles</button>
+          <input id="modeles-import-file-input" type="file" accept="application/json" hidden>
           <button id="modele-new-button" type="button">+ Nouveau modèle</button>
         </div>
         <p id="modele-error" role="alert"></p>
@@ -166,6 +191,8 @@
           Confirmer la suppression d'un tableau de bord en retapant son nom
         </label>
 
+        <button id="settings-change-logbook-folder-button" type="button">Changer de dossier Logbook</button>
+
         <p id="settings-error" role="alert"></p>
         <p><a href="confidentialite.html">Politique de confidentialité</a></p>
         <p id="app-version" class="field-hint"></p>
@@ -208,6 +235,13 @@
       <button id="modal-close" type="button" aria-label="Fermer">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
+      <section id="logbook-folder-modal" hidden>
+        <h2>Dossier Logbook</h2>
+        <p>Choisis le dossier Drive où l'app range toutes ses données (dashboards, entrées, modèles).</p>
+        <button id="logbook-folder-connect-button" type="button">Connecter mon dossier Drive « Logbook » existant</button>
+        <button id="logbook-folder-create-button" type="button">Créer un nouveau dossier Logbook</button>
+        <p id="logbook-folder-modal-error" role="alert"></p>
+      </section>
       <section id="entry-form-modal" hidden>
         <h2 id="entry-form-title">Nouvelle entrée</h2>
         <form id="entry-form">

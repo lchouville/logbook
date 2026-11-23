@@ -544,6 +544,9 @@ form button[type="submit"] {
 #sidebar-journaux button,
 #sidebar-journaux-plus,
 #sidebar-partage-button,
+#sidebar-connect-logbook-button,
+#sidebar-create-logbook-button,
+#sidebar-integration-button,
 #sidebar-modeles-button {
   display: block;
   width: 100%;
@@ -556,6 +559,8 @@ form button[type="submit"] {
 #sidebar-journaux button:hover,
 #sidebar-journaux-plus:hover,
 #sidebar-partage-button:hover,
+#sidebar-connect-logbook-button:hover,
+#sidebar-integration-button:hover,
 #sidebar-modeles-button:hover {
   background: var(--color-bg-hover);
 }
@@ -569,6 +574,9 @@ form button[type="submit"] {
 
 #sidebar-journaux-plus,
 #sidebar-partage-button,
+#sidebar-connect-logbook-button,
+#sidebar-create-logbook-button,
+#sidebar-integration-button,
 #sidebar-modeles-button {
   margin-top: 0.5rem;
 }
@@ -632,11 +640,23 @@ form button[type="submit"] {
   opacity: 0.9;
 }
 
-#entry-new-wrapper {
+#entries-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#entry-new-wrapper,
+#entry-import-wrapper {
   position: relative;
 }
 
-#entry-new-menu {
+#entry-import-button {
+  white-space: nowrap;
+}
+
+#entry-new-menu,
+#entry-import-menu {
   position: absolute;
   top: calc(100% + 0.25rem);
   right: 0;
@@ -652,7 +672,8 @@ form button[type="submit"] {
   gap: 0.125rem;
 }
 
-#entry-new-menu button {
+#entry-new-menu button,
+#entry-import-menu button {
   display: block;
   width: 100%;
   text-align: left;
@@ -660,7 +681,8 @@ form button[type="submit"] {
   border-color: transparent;
 }
 
-#entry-new-menu button:hover {
+#entry-new-menu button:hover,
+#entry-import-menu button:hover {
   background: var(--color-bg-hover);
 }
 

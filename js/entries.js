@@ -244,6 +244,24 @@ export function peutRemplirRessentiAFroid(entry, maintenant = new Date()) {
   return maintenant >= seuil;
 }
 
+// Valide la forme d'une entrée venue d'un fichier externe (import IA) avant de
+// l'ajouter au journal : un JSON mal formé écrit à la main sur le Drive ne doit
+// pas pouvoir casser l'affichage ou planter l'app silencieusement.
+export function validateImportedEntry(data) {
+  if (!data || typeof data !== 'object') return 'Le fichier ne contient pas un objet JSON.';
+  if (typeof data.id !== 'string' || !data.id) return 'Champ "id" manquant.';
+  if (typeof data.titre !== 'string') return 'Champ "titre" manquant.';
+  if (typeof data.date !== 'string' || !data.date) return 'Champ "date" manquant.';
+  if (!Array.isArray(data.themes) || !data.themes.every((t) => THEMES.includes(t))) return 'Champ "themes" invalide.';
+  if (!NIVEAUX_ACCES.includes(data.niveauAcces)) return 'Champ "niveauAcces" invalide.';
+  if (!STATUTS.includes(data.statut)) return 'Champ "statut" invalide.';
+  if (!data.contenuSchema || !Array.isArray(data.contenuSchema.blocks) || !Array.isArray(data.contenuSchema.order)) {
+    return 'Champ "contenuSchema" invalide.';
+  }
+  if (!data.contenuValeurs || typeof data.contenuValeurs !== 'object') return 'Champ "contenuValeurs" invalide.';
+  return null;
+}
+
 export function filtrerEntreesPartage(entries, regles) {
   return entries
     .filter((entry) => entry.themes.some((theme) => regles[theme]?.includes(entry.niveauAcces)))

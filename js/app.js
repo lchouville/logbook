@@ -1,4 +1,5 @@
-import { onAuthChange, signIn, signOut, getSessionDuration, setSessionDuration } from './auth.js';
+import { onAuthChange, signIn, signOut, getSessionDuration, setSessionDuration, getAccessToken } from './auth.js';
+import { pickSharedFile, pickFolder, pickOwnJsonFile } from './picker.js';
 import {
   loadEntries,
   saveEntries,
@@ -21,7 +22,17 @@ import {
   loadDashboards,
   saveDashboards,
   createDashboardFolder,
+  expectedDossierNom,
   deletePhoto,
+  listIntegrationFiles,
+  loadIntegrationFile,
+  deleteIntegrationFile,
+  connectLogbookFolder,
+  createLogbookFolder,
+  isLogbookFolderConnected,
+  probeLogbookFolder,
+  loadSharedFile,
+  LOGBOOK_FOLDER_NOT_CONNECTED,
 } from './drive.js';
 import {
   createEntry,
@@ -39,6 +50,7 @@ import {
   STATUTS,
   THEMES,
   FIXED_BLOCK_KEYS,
+  validateImportedEntry,
 } from './entries.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
 import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
@@ -65,10 +77,30 @@ appVersionEl.textContent = `Version ${APP_VERSION}`;
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
 const modelesSection = document.getElementById('modeles');
+const integrationSection = document.getElementById('integration');
+const integrationCount = document.getElementById('integration-count');
+const integrationError = document.getElementById('integration-error');
+const integrationList = document.getElementById('integration-list');
+const entryImportError = document.getElementById('entry-import-error');
+const logbookFolderConnectButton = document.getElementById('logbook-folder-connect-button');
+const logbookFolderCreateButton = document.getElementById('logbook-folder-create-button');
+const logbookFolderModalError = document.getElementById('logbook-folder-modal-error');
+const settingsChangeLogbookFolderButton = document.getElementById('settings-change-logbook-folder-button');
+const entryImportButton = document.getElementById('entry-import-button');
+const entryImportMenu = document.getElementById('entry-import-menu');
+const entryImportUploadButton = document.getElementById('entry-import-upload-button');
+const entryImportDriveButton = document.getElementById('entry-import-drive-button');
+const entryImportFileInput = document.getElementById('entry-import-file-input');
 const settingsSection = document.getElementById('settings');
 const partagesSection = document.getElementById('partages');
 const partagesRecusSection = document.getElementById('partages-recus');
 const modeleNewButton = document.getElementById('modele-new-button');
+const modelesExportButton = document.getElementById('modeles-export-button');
+const modelesImportButton = document.getElementById('modeles-import-button');
+const modelesImportFileInput = document.getElementById('modeles-import-file-input');
+const dashboardsExportButton = document.getElementById('dashboards-export-button');
+const dashboardsImportButton = document.getElementById('dashboards-import-button');
+const dashboardsImportFileInput = document.getElementById('dashboards-import-file-input');
 const modeleFormTitle = document.getElementById('modele-form-title');
 const modeleFormError = document.getElementById('modele-form-error');
 const entryNewButton = document.getElementById('entry-new-button');
@@ -132,6 +164,7 @@ let settings = {};
 let partages = [];
 let partagesRecus = [];
 let modeles = [];
+let integrationFiles = [];
 let editingPartageId = null;
 let editingEntryId = null;
 let editingEntryModeleId = null;
@@ -146,7 +179,7 @@ let editingModeleId = null;
 let modeleBilans = [];
 let ownerName = null;
 let currentJournalId = null;
-// Page affichée dans #main-content : 'entries' | 'modeles' | 'settings' | 'partages' | 'acces'.
+// Page affichée dans #main-content : 'entries' | 'modeles' | 'integration' | 'settings' | 'partages' | 'acces'.
 // currentJournalId prime dessus (journal partagé reçu affiché par-dessus, cf renderMainView).
 let mainView = 'entries';
 let dashboards = [];
@@ -1077,10 +1110,302 @@ modeleForm.addEventListener('submit', async (event) => {
   }
 });
 
+let integrationLoading = false;
+let integrationTotal = 0;
+
+function renderIntegrationList() {
+  if (integrationFiles.length === 0) {
+    integrationCount.textContent = integrationLoading ? `Chargement… 0/${integrationTotal}` : '';
+    renderListMessage(integrationList, integrationLoading ? 'Chargement…' : 'Aucune entrée en attente d\'intégration.');
+    return;
+  }
+  integrationCount.textContent = integrationLoading
+    ? `Chargement… ${integrationFiles.length}/${integrationTotal}`
+    : `${integrationFiles.length} fiche(s) à intégrer.`;
+  integrationList.innerHTML = '';
+  const dashboardsActifs = dashboards.filter((d) => !d.archive);
+  for (const item of integrationFiles) {
+    const li = document.createElement('li');
+
+    const nom = document.createElement('p');
+    nom.textContent = item.error ? `${item.name} — ${item.error}` : `${item.data.titre || '(sans titre)'} (${item.data.date})`;
+    li.appendChild(nom);
+
+    const actions = document.createElement('div');
+    actions.className = 'partage-actions';
+
+    const dashboardSelect = document.createElement('select');
+    dashboardSelect.setAttribute('aria-label', 'Tableau de bord de destination');
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = 'Choisir un tableau…';
+    dashboardSelect.appendChild(emptyOption);
+    for (const dashboard of dashboardsActifs) {
+      const option = document.createElement('option');
+      option.value = dashboard.id;
+      option.textContent = dashboard.nom;
+      dashboardSelect.appendChild(option);
+    }
+    dashboardSelect.value = item.targetDashboardId ?? '';
+    dashboardSelect.disabled = Boolean(item.error);
+    dashboardSelect.addEventListener('change', () => {
+      item.targetDashboardId = dashboardSelect.value || null;
+      integrerButton.disabled = Boolean(item.error) || !item.targetDashboardId;
+    });
+    actions.appendChild(dashboardSelect);
+
+    const integrerButton = document.createElement('button');
+    integrerButton.type = 'button';
+    integrerButton.textContent = 'Intégrer';
+    integrerButton.disabled = Boolean(item.error) || !item.targetDashboardId;
+    integrerButton.addEventListener('click', () => integrerFichierEnAttente(item));
+    actions.appendChild(integrerButton);
+
+    const rejeterButton = document.createElement('button');
+    rejeterButton.type = 'button';
+    rejeterButton.className = 'button-danger';
+    rejeterButton.textContent = 'Rejeter';
+    rejeterButton.addEventListener('click', () => rejeterFichierEnAttente(item));
+    actions.appendChild(rejeterButton);
+
+    li.appendChild(actions);
+    integrationList.appendChild(li);
+  }
+}
+
+const INTEGRATION_BATCH_SIZE = 5;
+
+async function loadIntegrationFiles() {
+  integrationError.textContent = '';
+  integrationFiles = [];
+  integrationTotal = 0;
+  integrationLoading = true;
+  renderIntegrationList();
+  try {
+    const files = await listIntegrationFiles();
+    integrationTotal = files.length;
+    const dashboardsActifs = dashboards.filter((d) => !d.archive);
+    // Un seul tableau de bord : pas d'ambiguïté possible, on le présélectionne.
+    // Plusieurs : le sélecteur reste vide pour forcer un choix explicite.
+    const defaultDashboardId = dashboardsActifs.length === 1 ? dashboardsActifs[0].id : null;
+    // Par lots pour afficher les résultats au fur et à mesure plutôt que d'attendre
+    // que tous les fichiers (potentiellement nombreux) soient chargés d'un coup.
+    for (let i = 0; i < files.length; i += INTEGRATION_BATCH_SIZE) {
+      const batch = files.slice(i, i + INTEGRATION_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (file) => {
+          try {
+            const data = await loadIntegrationFile(file.id);
+            const error = validateImportedEntry(data);
+            return { id: file.id, name: file.name, data, error, targetDashboardId: defaultDashboardId };
+          } catch (err) {
+            return { id: file.id, name: file.name, data: null, error: err.message, targetDashboardId: defaultDashboardId };
+          }
+        }),
+      );
+      integrationFiles = [...integrationFiles, ...batchResults];
+      renderIntegrationList();
+    }
+  } catch (error) {
+    integrationFiles = [];
+    integrationError.textContent =
+      error.message === LOGBOOK_FOLDER_NOT_CONNECTED
+        ? 'Connecte d\'abord ton dossier Logbook avec le bouton ci-dessus.'
+        : `Échec du chargement : ${error.message}`;
+  }
+  integrationLoading = false;
+  renderIntegrationList();
+}
+
+async function integrerFichierEnAttente(item) {
+  integrationError.textContent = '';
+  if (!item.targetDashboardId) {
+    integrationError.textContent = 'Choisis un tableau de bord de destination.';
+    return;
+  }
+  try {
+    if (item.targetDashboardId === activeDashboardId) {
+      if (entries.some((e) => e.id === item.data.id)) {
+        integrationError.textContent = 'Une entrée avec ce id existe déjà dans le journal.';
+        return;
+      }
+      const previousEntries = entries;
+      entries = [...entries, item.data];
+      try {
+        await saveEntries(entries);
+      } catch (error) {
+        entries = previousEntries;
+        throw error;
+      }
+      renderEntries();
+    } else {
+      const targetEntries = await loadEntries(item.targetDashboardId);
+      if (targetEntries.some((e) => e.id === item.data.id)) {
+        integrationError.textContent = 'Une entrée avec ce id existe déjà dans ce tableau de bord.';
+        return;
+      }
+      await saveEntries([...targetEntries, item.data], item.targetDashboardId);
+    }
+    await deleteIntegrationFile(item.id);
+    integrationFiles = integrationFiles.filter((f) => f.id !== item.id);
+    renderIntegrationList();
+  } catch (error) {
+    integrationError.textContent = `Échec de l'intégration : ${error.message}`;
+  }
+}
+
+async function rejeterFichierEnAttente(item) {
+  if (!window.confirm(`Rejeter définitivement « ${item.name} » sans l'intégrer ?`)) return;
+  integrationError.textContent = '';
+  try {
+    await deleteIntegrationFile(item.id);
+    integrationFiles = integrationFiles.filter((f) => f.id !== item.id);
+    renderIntegrationList();
+  } catch (error) {
+    integrationError.textContent = `Échec du rejet : ${error.message}`;
+  }
+}
+
+// Id du dossier Application détecté par probeLogbookFolder (cf openLogbookFolderModal),
+// pour ouvrir le Picker directement dedans plutôt qu'à la racine du Drive.
+let probedAppFolderId = null;
+
+// Avant d'afficher la popup : sonde si Application/Logbook est déjà visible de
+// l'app (créé par elle plus tôt, ou déjà connecté une fois) pour ne proposer que
+// l'action pertinente — Connecter si trouvé, Créer sinon (cf probeLogbookFolder
+// dans drive.js : un dossier existant mais jamais vu par l'app reste indétectable,
+// d'où le bouton Créer qui reste toujours la solution de repli).
+async function openLogbookFolderModal() {
+  logbookFolderModalError.textContent = '';
+  let found = false;
+  try {
+    const probe = await probeLogbookFolder();
+    found = probe.found;
+    probedAppFolderId = probe.appFolderId;
+  } catch {
+    probedAppFolderId = null;
+  }
+  logbookFolderConnectButton.hidden = !found;
+  logbookFolderCreateButton.hidden = found;
+  openModal('logbook-folder-modal');
+}
+
+// Toutes les données de l'app (dashboards, entrées, modèles, entries_to_import)
+// dépendent désormais du dossier Logbook connecté (cf getAppFolderId dans
+// drive.js) : (re)connecter un dossier doit donc tout recharger depuis ce
+// nouveau dossier, pas juste la liste d'intégration.
+logbookFolderConnectButton.addEventListener('click', async () => {
+  logbookFolderModalError.textContent = '';
+  try {
+    const folderId = await pickFolder(getAccessToken(), probedAppFolderId);
+    await connectLogbookFolder(folderId);
+    closeModal();
+    await loadAccountAndDashboards();
+    if (mainView === 'integration') await loadIntegrationFiles();
+  } catch (error) {
+    logbookFolderModalError.textContent = error.message;
+  }
+});
+
+// Pas de dossier Logbook existant à pointer (premier usage) : l'app crée et
+// connecte elle-même Application/Logbook, sans passer par le Picker.
+logbookFolderCreateButton.addEventListener('click', async () => {
+  logbookFolderModalError.textContent = '';
+  try {
+    await createLogbookFolder();
+    closeModal();
+    await loadAccountAndDashboards();
+  } catch (error) {
+    logbookFolderModalError.textContent = error.message;
+  }
+});
+
+settingsChangeLogbookFolderButton.addEventListener('click', openLogbookFolderModal);
+
+function closeEntryImportMenu() {
+  entryImportMenu.hidden = true;
+  entryImportButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleEntryImportMenu() {
+  const willOpen = entryImportMenu.hidden;
+  entryImportMenu.hidden = !willOpen;
+  entryImportButton.setAttribute('aria-expanded', String(willOpen));
+}
+
+entryImportButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  toggleEntryImportMenu();
+});
+
+document.addEventListener('click', (event) => {
+  if (!entryImportMenu.hidden && !event.target.closest('#entry-import-wrapper')) closeEntryImportMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !entryImportMenu.hidden) closeEntryImportMenu();
+});
+
+entryImportUploadButton.addEventListener('click', () => {
+  closeEntryImportMenu();
+  entryImportFileInput.click();
+});
+
+// Importé depuis le journal d'un jdb précis (bouton "Importer" à côté de "+
+// Nouvelle entrée") : contrairement à la liste d'attente (fichiers déposés sur le
+// Drive par un tiers, où le jdb cible est ambigu), ici le contexte est déjà celui
+// du jdb affiché, donc l'entrée y est ajoutée directement, sans détour.
+async function integrerEntreeDirecte(data) {
+  entryImportError.textContent = '';
+  const error = validateImportedEntry(data);
+  if (error) {
+    entryImportError.textContent = error;
+    return;
+  }
+  if (entries.some((e) => e.id === data.id)) {
+    entryImportError.textContent = 'Une entrée avec ce id existe déjà dans ce journal.';
+    return;
+  }
+  const previousEntries = entries;
+  entries = [...entries, data];
+  try {
+    await saveEntries(entries);
+    await syncPartages();
+    renderEntries();
+  } catch (err) {
+    entries = previousEntries;
+    entryImportError.textContent = `Échec de l'import : ${err.message}`;
+  }
+}
+
+entryImportFileInput.addEventListener('change', async () => {
+  const file = entryImportFileInput.files[0];
+  entryImportFileInput.value = '';
+  if (!file) return;
+  entryImportError.textContent = '';
+  try {
+    await integrerEntreeDirecte(JSON.parse(await file.text()));
+  } catch (error) {
+    entryImportError.textContent = `Fichier illisible : ${error.message}`;
+  }
+});
+
+entryImportDriveButton.addEventListener('click', async () => {
+  closeEntryImportMenu();
+  entryImportError.textContent = '';
+  try {
+    const fileId = await pickOwnJsonFile(getAccessToken());
+    await integrerEntreeDirecte(await loadSharedFile(fileId));
+  } catch (error) {
+    entryImportError.textContent = error.message;
+  }
+});
+
 function renderMainView() {
   entriesSection.hidden = true;
   journalPartageSection.hidden = true;
   modelesSection.hidden = true;
+  integrationSection.hidden = true;
   settingsSection.hidden = true;
   partagesSection.hidden = true;
   partagesRecusSection.hidden = true;
@@ -1090,6 +1415,8 @@ function renderMainView() {
   // rien, puisque ce bloc resterait sur journalPartageSection.
   if (mainView === 'modeles') {
     modelesSection.hidden = false;
+  } else if (mainView === 'integration') {
+    integrationSection.hidden = false;
   } else if (mainView === 'settings') {
     settingsSection.hidden = false;
   } else if (mainView === 'partages') {
@@ -1154,6 +1481,12 @@ initSidebar({
     renderMainView();
     closeSidebarOnMobile();
   },
+  onOpenIntegration: () => {
+    mainView = 'integration';
+    renderMainView();
+    loadIntegrationFiles();
+    closeSidebarOnMobile();
+  },
   onSelectDashboard: switchDashboard,
   onCreateDashboard: createDashboard,
   onRenameDashboard: renameDashboard,
@@ -1165,6 +1498,86 @@ initSidebar({
 modeleNewButton.addEventListener('click', () => {
   stopEditModele();
   openModal('modele-form-modal');
+});
+
+function downloadJson(data, fileName) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+modelesExportButton.addEventListener('click', () => {
+  downloadJson(modeles, `logbook-templates-${new Date().toISOString().slice(0, 10)}.json`);
+});
+
+dashboardsExportButton.addEventListener('click', () => {
+  downloadJson(dashboards, `logbook-dashboards-${new Date().toISOString().slice(0, 10)}.json`);
+});
+
+modelesImportButton.addEventListener('click', () => modelesImportFileInput.click());
+
+modelesImportFileInput.addEventListener('change', async () => {
+  const file = modelesImportFileInput.files[0];
+  modelesImportFileInput.value = '';
+  if (!file) return;
+  modeleError.textContent = '';
+  let imported;
+  try {
+    imported = JSON.parse(await file.text());
+    if (!Array.isArray(imported)) throw new Error('Le fichier ne contient pas un tableau JSON.');
+  } catch (error) {
+    modeleError.textContent = `Fichier illisible : ${error.message}`;
+    return;
+  }
+  if (!window.confirm(`Remplacer les ${modeles.length} modèle(s) actuel(s) par les ${imported.length} du fichier ?`)) return;
+  const previousModeles = modeles;
+  modeles = imported;
+  renderModeles();
+  renderEntryNewMenu();
+  try {
+    await saveModeles(modeles);
+  } catch (error) {
+    modeles = previousModeles;
+    renderModeles();
+    renderEntryNewMenu();
+    modeleError.textContent = `Échec de l'import : ${error.message}`;
+  }
+});
+
+dashboardsImportButton.addEventListener('click', () => dashboardsImportFileInput.click());
+
+dashboardsImportFileInput.addEventListener('change', async () => {
+  const file = dashboardsImportFileInput.files[0];
+  dashboardsImportFileInput.value = '';
+  if (!file) return;
+  sidebarDashboardsError.textContent = '';
+  let imported;
+  try {
+    imported = JSON.parse(await file.text());
+    if (!Array.isArray(imported)) throw new Error('Le fichier ne contient pas un tableau JSON.');
+  } catch (error) {
+    sidebarDashboardsError.textContent = `Fichier illisible : ${error.message}`;
+    return;
+  }
+  if (!window.confirm(`Remplacer les ${dashboards.length} tableau(x) de bord actuel(s) par les ${imported.length} du fichier ?`)) return;
+  const previousDashboards = dashboards;
+  dashboards = imported;
+  try {
+    await saveDashboards(dashboards);
+    if (!dashboards.some((d) => d.id === activeDashboardId)) {
+      activeDashboardId = dashboards[0]?.id ?? 'default';
+      setActiveDashboard(activeDashboardId);
+    }
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+    await loadAccountData();
+    renderMainView();
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de l'import : ${error.message}`;
+  }
 });
 
 signInButton.addEventListener('click', signIn);
@@ -1435,6 +1848,45 @@ function renderTableLoading(tbody, colspan) {
   renderTableMessage(tbody, colspan, 'Chargement…');
 }
 
+// Charge le registre des dashboards puis toutes les données du dashboard actif.
+// Partagée entre la connexion Google initiale et une (re)connexion du dossier
+// Logbook (cf connectLogbookFolderFlow) : dans les deux cas, tout ce qui dépend
+// de getAppFolderId() (dashboards, entrées, modèles...) doit être rechargé depuis
+// le bon dossier.
+async function loadAccountAndDashboards() {
+  // Feedback immédiat : sans ça, sidebar et contenu restent figés/vides pendant les
+  // premiers appels Drive (chargement du registre de dashboards), avant même que
+  // loadAccountData démarre — ça donnait une impression de chargement incohérent.
+  renderMainView();
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+
+  try {
+    dashboards = await loadDashboards();
+  } catch (error) {
+    dashboards = [{ id: 'default', nom: 'Mon journal de bord', dossierNom: 'logbook', creeLe: new Date().toISOString() }];
+    // Le dossier connecté a pu être supprimé/déplacé entre-temps sur le Drive :
+    // getAppFolderId (drive.js) l'a alors détecté et déjà retiré du lien local
+    // (localStorage) — ne pas attendre un prochain rechargement de page pour
+    // reproposer la connexion, la rouvrir tout de suite.
+    if (error.message === LOGBOOK_FOLDER_NOT_CONNECTED) {
+      await openLogbookFolderModal();
+    } else {
+      sidebarDashboardsError.textContent = `Échec du chargement des tableaux de bord : ${error.message}`;
+    }
+  }
+  const storedDashboardId = localStorage.getItem(ACTIVE_DASHBOARD_KEY);
+  activeDashboardId = dashboards.some((d) => d.id === storedDashboardId) ? storedDashboardId : 'default';
+  setActiveDashboard(activeDashboardId);
+  // Dashboards connus tout de suite : la liste/bouton "créer" s'affichent sans attendre
+  // le reste (entrées/partages/modèles), qui arrive progressivement via loadAccountData.
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+
+  await loadAccountData();
+
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  renderMainView();
+}
+
 // Charge entries/settings/partages/partagesRecus/modeles pour le dashboard actif
 // (déjà sélectionné via setActiveDashboard) et réaffiche les vues correspondantes.
 // Partagée entre la connexion initiale et la bascule de dashboard.
@@ -1582,7 +2034,7 @@ async function createDashboard() {
   if (!nom || !nom.trim()) return;
   sidebarDashboardsError.textContent = '';
   const id = crypto.randomUUID();
-  const dossierNom = `logbook-${id}`;
+  const dossierNom = expectedDossierNom({ id, nom: nom.trim() });
   const previousDashboards = dashboards;
   try {
     const dossierId = await createDashboardFolder(dossierNom);
@@ -1698,30 +2150,8 @@ onAuthChange(async (token) => {
   if (connected) {
     currentJournalId = getJournalIdFromUrl();
     mainView = 'entries';
-
-    // Feedback immédiat : sans ça, sidebar et contenu restent figés/vides pendant les
-    // premiers appels Drive (chargement du registre de dashboards), avant même que
-    // loadAccountData démarre — ça donnait une impression de chargement incohérent.
-    renderMainView();
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-
-    try {
-      dashboards = await loadDashboards();
-    } catch (error) {
-      dashboards = [{ id: 'default', nom: 'Mon journal de bord', dossierNom: 'logbook', creeLe: new Date().toISOString() }];
-      sidebarDashboardsError.textContent = `Échec du chargement des tableaux de bord : ${error.message}`;
-    }
-    const storedDashboardId = localStorage.getItem(ACTIVE_DASHBOARD_KEY);
-    activeDashboardId = dashboards.some((d) => d.id === storedDashboardId) ? storedDashboardId : 'default';
-    setActiveDashboard(activeDashboardId);
-    // Dashboards connus tout de suite : la liste/bouton "créer" s'affichent sans attendre
-    // le reste (entrées/partages/modèles), qui arrive progressivement via loadAccountData.
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-
-    await loadAccountData();
-
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-    renderMainView();
+    if (!isLogbookFolderConnected()) await openLogbookFolderModal();
+    await loadAccountAndDashboards();
   } else {
     entries = [];
     settings = {};
