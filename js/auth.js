@@ -5,6 +5,25 @@ const SIGNED_OUT_KEY = 'logbook_signed_out';
 const SESSION_DURATION_KEY = 'logbook_session_duration';
 const LAST_SIGNIN_KEY = 'logbook_last_signin_at';
 
+// Mode test local (dev uniquement, voir dev-server.py) : contourne la connexion
+// Google, les appels Drive (js/drive.js) sont redirigés vers un dossier sur disque
+// (.devdrive/, gitignoré). Jamais actif ailleurs qu'en localhost — même si ce token
+// fuitait vers gh-pages, le serveur de dev n'existe pas en prod, donc rien à lire.
+export const isLocalDevHost = typeof location !== 'undefined' && ['localhost', '127.0.0.1'].includes(location.hostname);
+const DEV_LOCAL_TOKEN = 'dev-local-token';
+
+export function isDevLocalMode() {
+  return accessToken === DEV_LOCAL_TOKEN;
+}
+
+export function enableDevLocalMode() {
+  accessToken = DEV_LOCAL_TOKEN;
+  sessionStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+  localStorage.removeItem(SIGNED_OUT_KEY);
+  markSignedIn();
+  notifyChange();
+}
+
 // Le token Google lui-même expire toujours après ~1h (fixé par Google, non
 // configurable) et se renouvelle en silence (cf refreshAccessToken plus bas).
 // Cette durée-ci est différente : le temps max depuis la dernière connexion
@@ -189,7 +208,10 @@ function forceExpiredLogout() {
 // chargement de page tant que l'utilisateur ne s'est pas déconnecté
 // explicitement — évite de recliquer "Se connecter" à chaque nouvel onglet
 // si une session Google active et un consentement déjà donné existent.
-if (!accessToken && localStorage.getItem(SIGNED_OUT_KEY) !== '1') {
+// Désactivé en localhost : le choix Google/test local doit toujours être explicite
+// (sinon une reconnexion Google silencieuse pourrait devancer le clic sur le bouton
+// de test local), voir isLocalDevHost.
+if (!isLocalDevHost && !accessToken && localStorage.getItem(SIGNED_OUT_KEY) !== '1') {
   if (isSessionExpired()) {
     forceExpiredLogout();
   } else {
