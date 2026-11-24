@@ -316,6 +316,52 @@ form button[type="submit"] {
   gap: 0.5rem;
 }
 
+.integration-group-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.integration-group-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.integration-group-title-row p {
+  margin: 0;
+}
+
+.integration-group-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1;
+  padding: 0.125rem 0.25rem;
+}
+
+.integration-subgroup-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.375rem;
+}
+
+.integration-subgroup-header p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-fg-secondary);
+}
+
+.integration-item-detail {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-fg-secondary);
+}
+
 .ressenti-froid-form {
   display: flex;
   align-items: center;
@@ -1136,6 +1182,18 @@ form button[type="submit"] {
 
 #modal-panel.modal-panel--wide {
   max-width: 60rem;
+}
+
+#integration-progress-bar {
+  width: 100%;
+}
+
+#mapping-correction-list li,
+#inspection-fiche-mapping-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 #modal-close {

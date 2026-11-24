@@ -13,6 +13,7 @@
     <h1>Logbook</h1>
     <p>Journal de bord — en construction.</p>
     <button id="sign-in" type="button">Se connecter avec Google</button>
+    <button id="dev-local-button" type="button" hidden>Mode test local (sans Google)</button>
     <p id="auth-status">Non connecté.</p>
   </section>
 
@@ -241,6 +242,27 @@
         <button id="logbook-folder-connect-button" type="button">Connecter mon dossier Drive « Logbook » existant</button>
         <button id="logbook-folder-create-button" type="button">Créer un nouveau dossier Logbook</button>
         <p id="logbook-folder-modal-error" role="alert"></p>
+      </section>
+      <section id="integration-progress-modal" hidden>
+        <h2 id="integration-progress-title">Traitement en cours…</h2>
+        <progress id="integration-progress-bar" value="0" max="1"></progress>
+        <p id="integration-progress-count"></p>
+        <p>Ne modifie pas les tableaux de bord ou les entrées pendant ce traitement.</p>
+      </section>
+      <section id="mapping-correction-modal" hidden>
+        <h2>Correction du mappage</h2>
+        <p>Ces champs du modèle n'ont pas de correspondance évidente dans la fiche importée. Relie-les si besoin — ce qui reste sans lien sera ajouté en texte brut dans l'entrée.</p>
+        <ul id="mapping-correction-list" class="card-list"></ul>
+        <button id="mapping-correction-submit" type="button">Valider le mappage</button>
+      </section>
+      <section id="inspection-fiche-modal" hidden>
+        <h2 id="inspection-fiche-title">Inspection</h2>
+        <div id="inspection-fiche-detail"></div>
+        <ul id="inspection-fiche-mapping-list" class="card-list"></ul>
+        <div class="partage-actions">
+          <button id="inspection-fiche-integrer" type="button">Intégrer</button>
+          <button id="inspection-fiche-rejeter" type="button" class="button-danger">Rejeter</button>
+        </div>
       </section>
       <section id="entry-form-modal" hidden>
         <h2 id="entry-form-title">Nouvelle entrée</h2>
