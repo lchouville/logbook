@@ -42,6 +42,15 @@ def disk_path(entry):
     return os.path.join(DATA_DIR, entry['path'])
 
 
+def safe_name(name):
+    """Rejette un nom de fichier/dossier qui tenterait de sortir de DATA_DIR
+    (ex. '../../etc/passwd') : les noms viennent de l'app mais peuvent être
+    tapés librement par l'utilisateur (nom de dashboard, de partage...)."""
+    if not name or '/' in name or '\\' in name or name in ('.', '..'):
+        raise ApiError(400, 'Nom de fichier invalide : ' + repr(name))
+    return name
+
+
 def children_of(index, parent_id):
     return {fid: e for fid, e in index.items() if e.get('parentId') == parent_id}
 
@@ -198,7 +207,7 @@ class DevDriveHandler(http.server.SimpleHTTPRequestHandler):
 
     def _create_metadata_item(self, index):
         body = json.loads(self._read_body() or b'{}')
-        name = body['name']
+        name = safe_name(body['name'])
         mime_type = body.get('mimeType', 'application/octet-stream')
         parents = body.get('parents') or ['']
         parent_id = parents[0]
@@ -250,14 +259,15 @@ class DevDriveHandler(http.server.SimpleHTTPRequestHandler):
             return self._send_json(200, {'id': file_id})
         body = json.loads(self._read_body() or b'{}')
         if 'name' in body:
+            new_name = safe_name(body['name'])
             parent_path = index[entry['parentId']]['path'] if entry.get('parentId') else ''
-            new_rel = os.path.join(parent_path, body['name']) if parent_path else body['name']
+            new_rel = os.path.join(parent_path, new_name) if parent_path else new_name
             old_full = disk_path(entry)
             new_full = os.path.join(DATA_DIR, new_rel)
             if os.path.exists(old_full):
                 os.makedirs(os.path.dirname(new_full) or DATA_DIR, exist_ok=True)
                 shutil.move(old_full, new_full)
-            entry['name'] = body['name']
+            entry['name'] = new_name
             entry['path'] = new_rel
             # Les sous-chemins indexés (enfants d'un dossier renommé) doivent suivre.
             if entry['type'] == 'folder':
@@ -311,7 +321,7 @@ class DevDriveHandler(http.server.SimpleHTTPRequestHandler):
         parts = self._parse_multipart(body, boundary)
         metadata = json.loads(parts['metadata'])
         file_bytes = parts['file']
-        name = metadata['name']
+        name = safe_name(metadata['name'])
         parents = metadata.get('parents') or ['']
         parent_id = parents[0]
         file_id = uuid.uuid4().hex
@@ -369,7 +379,10 @@ class ThreadingHTTPServer(http.server.ThreadingHTTPServer):
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
     os.makedirs(DATA_DIR, exist_ok=True)
-    server = ThreadingHTTPServer(('', port), DevDriveHandler)
+    # 127.0.0.1 plutôt que '' (toutes interfaces) : ce serveur n'a aucune auth et
+    # écrit sur disque sur simple requête HTTP, il ne doit jamais être joignable
+    # depuis le réseau local.
+    server = ThreadingHTTPServer(('127.0.0.1', port), DevDriveHandler)
     print(f'Serveur dev sur http://localhost:{port}  (stockage local : {DATA_DIR})')
     try:
         server.serve_forever()

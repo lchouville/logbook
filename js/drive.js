@@ -84,10 +84,16 @@ async function describeError(response) {
   return apiMessage ? `${response.status} ${apiMessage}` : `${response.status} ${response.statusText}`;
 }
 
+// Un nom (dossier/fichier) contenant une apostrophe casserait la requête Drive
+// si elle n'était pas échappée (ex. un nom de dashboard saisi par l'utilisateur).
+function escapeDriveQueryValue(value) {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 async function findFolder(name, parentId) {
   const parentClause = parentId ? `'${parentId}' in parents` : "'root' in parents";
   const params = new URLSearchParams({
-    q: `name='${name}' and mimeType='${FOLDER_MIME_TYPE}' and trashed=false and ${parentClause}`,
+    q: `name='${escapeDriveQueryValue(name)}' and mimeType='${FOLDER_MIME_TYPE}' and trashed=false and ${parentClause}`,
     spaces: 'drive',
     fields: 'files(id,name)',
   });
@@ -426,7 +432,7 @@ async function migrateLegacyFile(folderId) {
 
 async function findFileByName(fileName, folderId) {
   const params = new URLSearchParams({
-    q: `name='${fileName}' and trashed=false and '${folderId}' in parents`,
+    q: `name='${escapeDriveQueryValue(fileName)}' and trashed=false and '${folderId}' in parents`,
     spaces: 'drive',
     fields: 'files(id,name)',
   });
