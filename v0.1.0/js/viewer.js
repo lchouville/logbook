@@ -1,0 +1,146 @@
+import { getAccessToken } from './auth.js';
+import {
+  loadSharedFile,
+  getSharedFileName,
+  loadPartagesRecus,
+  savePartagesRecus,
+  createPartageRecuShortcut,
+} from './drive.js';
+import { pickSharedFile } from './picker.js';
+import { migrateEntryContenu, previewContenuTexte } from './entries.js';
+
+const viewerGrantAccess = document.getElementById('viewer-grant-access');
+const viewerError = document.getElementById('viewer-error');
+const viewerTableBody = document.getElementById('viewer-table-body');
+
+const VIEWER_PAGE_SIZE_DEFAULT = 10;
+
+let currentFileId = null;
+let currentOnPartagesRecusChanged = null;
+let viewerEntries = [];
+let viewerPageSize = VIEWER_PAGE_SIZE_DEFAULT;
+let viewerVisibleCount = VIEWER_PAGE_SIZE_DEFAULT;
+
+export function setViewerPageSize(pageSize) {
+  viewerPageSize = pageSize;
+}
+
+function appendCell(row, text) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  row.appendChild(td);
+  return td;
+}
+
+function renderViewerLoading() {
+  viewerTableBody.innerHTML = '';
+  const row = document.createElement('tr');
+  const td = document.createElement('td');
+  td.colSpan = 7;
+  td.textContent = 'Chargement…';
+  row.appendChild(td);
+  viewerTableBody.appendChild(row);
+}
+
+let viewerLoadMoreObserver = null;
+
+function getViewerLoadMoreObserver() {
+  if (!viewerLoadMoreObserver) {
+    viewerLoadMoreObserver = new IntersectionObserver((observedEntries) => {
+      if (observedEntries.some((observed) => observed.isIntersecting)) {
+        viewerVisibleCount += viewerPageSize;
+        renderViewerEntries();
+      }
+    });
+  }
+  return viewerLoadMoreObserver;
+}
+
+function renderViewerEntries() {
+  viewerTableBody.innerHTML = '';
+  const sorted = [...viewerEntries].reverse();
+  const visible = sorted.slice(0, viewerVisibleCount);
+
+  for (const entry of visible) {
+    const row = document.createElement('tr');
+
+    appendCell(row, entry.date);
+    appendCell(row, entry.titre ?? '');
+    appendCell(row, entry.themes.join(', '));
+    appendCell(row, entry.niveauAcces);
+    appendCell(row, entry.statut);
+    appendCell(row, previewContenuTexte(entry));
+    appendCell(row, entry.ressentiAFroid != null ? `${entry.ressentiAFroid}/10` : '—');
+
+    viewerTableBody.appendChild(row);
+  }
+
+  const observer = getViewerLoadMoreObserver();
+  observer.disconnect();
+  if (visible.length < sorted.length) {
+    const sentinelRow = document.createElement('tr');
+    const sentinelCell = document.createElement('td');
+    sentinelCell.colSpan = 7;
+    sentinelRow.appendChild(sentinelCell);
+    viewerTableBody.appendChild(sentinelRow);
+    observer.observe(sentinelRow);
+  }
+}
+
+async function recordPartageRecu(fileId, onPartagesRecusChanged) {
+  try {
+    const recus = await loadPartagesRecus();
+    const existing = recus.find((p) => p.fichierId === fileId);
+    const maintenant = new Date().toISOString();
+    let updated;
+    if (existing) {
+      updated = recus.map((p) => (p.fichierId === fileId ? { ...p, dernierAccesLe: maintenant } : p));
+    } else {
+      const nom = await getSharedFileName(fileId);
+      try {
+        await createPartageRecuShortcut(fileId, nom);
+      } catch (error) {
+        console.warn('Échec de la création du raccourci Drive :', error);
+      }
+      updated = [
+        ...recus,
+        { id: crypto.randomUUID(), fichierId: fileId, nom, premierAccesLe: maintenant, dernierAccesLe: maintenant },
+      ];
+    }
+    await savePartagesRecus(updated);
+    onPartagesRecusChanged?.(updated);
+  } catch (error) {
+    console.error("Échec de l'enregistrement dans « Partages reçus » :", error);
+    viewerError.textContent = `Journal affiché, mais pas ajouté à « Partages reçus » : ${error.message}`;
+  }
+}
+
+export async function renderJournalPartage(fileId, onPartagesRecusChanged) {
+  currentFileId = fileId;
+  currentOnPartagesRecusChanged = onPartagesRecusChanged;
+
+  viewerError.textContent = '';
+  renderViewerLoading();
+
+  try {
+    viewerEntries = (await loadSharedFile(fileId)).map(migrateEntryContenu);
+    viewerVisibleCount = viewerPageSize;
+    viewerGrantAccess.hidden = true;
+    renderViewerEntries();
+    await recordPartageRecu(fileId, onPartagesRecusChanged);
+  } catch (error) {
+    viewerTableBody.innerHTML = '';
+    viewerGrantAccess.hidden = false;
+    viewerError.textContent = `Accès au journal partagé impossible pour l'instant (${error.message}). Donne l'accès via le bouton ci-dessous.`;
+  }
+}
+
+viewerGrantAccess.addEventListener('click', async () => {
+  viewerError.textContent = '';
+  try {
+    await pickSharedFile(getAccessToken());
+    await renderJournalPartage(currentFileId, currentOnPartagesRecusChanged);
+  } catch (error) {
+    viewerError.textContent = error.message;
+  }
+});
