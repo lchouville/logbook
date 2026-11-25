@@ -191,10 +191,10 @@ function buildFieldInput(field, value, idPrefix) {
   return input;
 }
 
-function buildCustomFieldLi(field, value, idPrefix) {
+function buildCustomFieldLi(field, value, idPrefix, readOnly) {
   const li = document.createElement('li');
   li.className = 'entry-block-row';
-  li.draggable = true;
+  li.draggable = !readOnly;
   li.dataset.orderKey = field.id;
 
   const handle = document.createElement('span');
@@ -216,6 +216,7 @@ function buildCustomFieldLi(field, value, idPrefix) {
   editButton.className = 'entry-block-edit-button';
   editButton.textContent = 'Modifier';
   editButton.setAttribute('aria-label', `Modifier le champ ${field.nom}`);
+  editButton.hidden = Boolean(readOnly);
   li.appendChild(editButton);
 
   return li;
@@ -248,6 +249,7 @@ export function createFieldsEditor({ listEl, addButtonEl, idPrefix, fixedBlockEl
   let values = {};
   let draggedOrderKey = null;
   let lastHoverLi = null;
+  let readOnly = false;
 
   function render(newSchema, newValues = {}) {
     schema = newSchema;
@@ -255,13 +257,22 @@ export function createFieldsEditor({ listEl, addButtonEl, idPrefix, fixedBlockEl
     listEl.innerHTML = '';
     for (const key of schema.order) {
       if (fixedBlockElements[key]) {
+        fixedBlockElements[key].draggable = !readOnly;
         listEl.appendChild(fixedBlockElements[key]);
         continue;
       }
       const field = schema.fields.find((f) => f.id === key);
       if (!field) continue; // défensif : entrée d'ordre obsolète
-      listEl.appendChild(buildCustomFieldLi(field, values[key], idPrefix));
+      listEl.appendChild(buildCustomFieldLi(field, values[key], idPrefix, readOnly));
     }
+  }
+
+  // Le <fieldset disabled> englobant désactive les champs natifs mais pas le
+  // glisser-déposer (attribut draggable + listeners sur listEl) ni le clic
+  // ouvrant le popover d'édition sur un <li> : à bloquer explicitement ici.
+  function setReadOnly(value) {
+    readOnly = value;
+    render(schema, values);
   }
 
   // Recapture d'abord ce qui est tapé dans le DOM avant de reconstruire la
@@ -300,6 +311,7 @@ export function createFieldsEditor({ listEl, addButtonEl, idPrefix, fixedBlockEl
   }
 
   listEl.addEventListener('click', (event) => {
+    if (readOnly) return;
     if (event.target.closest('input, select, .drag-handle')) return;
     const li = event.target.closest('li[data-order-key]');
     if (!li) return;
@@ -307,9 +319,13 @@ export function createFieldsEditor({ listEl, addButtonEl, idPrefix, fixedBlockEl
     if (field) openFieldEditor(editor, field, li);
   });
 
-  addButtonEl.addEventListener('click', () => openFieldEditor(editor, null, addButtonEl));
+  addButtonEl.addEventListener('click', () => {
+    if (readOnly) return;
+    openFieldEditor(editor, null, addButtonEl);
+  });
 
   listEl.addEventListener('dragstart', (event) => {
+    if (readOnly) return;
     const li = event.target.closest('li[data-order-key]');
     if (!li) return;
     draggedOrderKey = li.dataset.orderKey;
@@ -359,6 +375,7 @@ export function createFieldsEditor({ listEl, addButtonEl, idPrefix, fixedBlockEl
 
   const editor = {
     render,
+    setReadOnly,
     getSchema: () => schema,
     getValues: () => readFieldValues(listEl, schema, idPrefix),
     getField,
