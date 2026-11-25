@@ -43,6 +43,10 @@ export function openModal(sectionId, { dismissable: canDismiss = true } = {}) {
     document.getElementById(id).hidden = id !== sectionId;
   }
   modalPanel.classList.toggle('modal-panel--wide', WIDE_SECTION_IDS.includes(sectionId));
+  // Associe la modale à son titre pour les lecteurs d'écran (chaque section a
+  // son propre <h2>, le dialog générique n'a pas de libellé fixe).
+  const titleEl = document.querySelector(`#${sectionId} h2`);
+  if (titleEl) modalPanel.setAttribute('aria-labelledby', titleEl.id);
   dismissable = canDismiss;
   modalClose.hidden = !canDismiss;
   returnFocusEl = document.activeElement;
