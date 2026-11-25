@@ -70,10 +70,40 @@
           </div>
         </div>
         <p id="entry-import-error" role="alert"></p>
+        <div id="entry-filters">
+          <label for="entry-search-input" class="sr-only">Rechercher</label>
+          <input id="entry-search-input" type="search" placeholder="Rechercher…">
+          <label for="entry-filter-theme" class="sr-only">Thème</label>
+          <select id="entry-filter-theme"></select>
+          <label for="entry-filter-statut" class="sr-only">Statut</label>
+          <select id="entry-filter-statut"></select>
+          <label for="entry-filter-niveau" class="sr-only">Niveau</label>
+          <select id="entry-filter-niveau"></select>
+          <label for="entry-filter-modele" class="sr-only">Modèle</label>
+          <select id="entry-filter-modele"></select>
+          <label for="entry-filter-date-from" class="sr-only">Du</label>
+          <input id="entry-filter-date-from" type="date">
+          <label for="entry-filter-date-to" class="sr-only">Au</label>
+          <input id="entry-filter-date-to" type="date">
+          <label for="entry-filter-archive" class="sr-only">Entrées à afficher</label>
+          <select id="entry-filter-archive">
+            <option value="entries">Entrées</option>
+            <option value="all">Toutes</option>
+            <option value="archived">Archivées</option>
+          </select>
+        </div>
+        <div id="entry-bulk-actions" hidden>
+          <span id="entry-bulk-count"></span>
+          <button id="entry-bulk-delete" type="button" class="button-danger">Supprimer</button>
+          <button id="entry-bulk-move" type="button">Déplacer vers…</button>
+          <button id="entry-bulk-archive" type="button">Archiver</button>
+          <button id="entry-bulk-modele" type="button">Changer de modèle</button>
+        </div>
         <div class="table-wrapper" id="entry-table-wrapper">
           <table id="entry-table">
             <thead>
               <tr>
+                <th scope="col"><input id="entry-select-all" type="checkbox" aria-label="Tout sélectionner"></th>
                 <th scope="col">Date</th>
                 <th scope="col">Titre</th>
                 <th scope="col">Thème(s)</th>
@@ -254,6 +284,20 @@
         <p>Ces champs du modèle n'ont pas de correspondance évidente dans la fiche importée. Relie-les si besoin — ce qui reste sans lien sera ajouté en texte brut dans l'entrée.</p>
         <ul id="mapping-correction-list" class="card-list"></ul>
         <button id="mapping-correction-submit" type="button">Valider le mappage</button>
+      </section>
+      <section id="entry-move-modal" hidden>
+        <h2>Déplacer les entrées</h2>
+        <label for="entry-move-dashboard">Tableau de bord de destination</label>
+        <select id="entry-move-dashboard"></select>
+        <p id="entry-move-error" role="alert"></p>
+        <button id="entry-move-submit" type="button">Déplacer</button>
+      </section>
+      <section id="entry-modele-change-modal" hidden>
+        <h2>Changer de modèle</h2>
+        <label for="entry-modele-change-select">Nouveau modèle</label>
+        <select id="entry-modele-change-select"></select>
+        <p id="entry-modele-change-error" role="alert"></p>
+        <button id="entry-modele-change-submit" type="button">Appliquer</button>
       </section>
       <section id="inspection-fiche-modal" hidden>
         <h2 id="inspection-fiche-title">Inspection</h2>
