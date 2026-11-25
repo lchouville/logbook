@@ -1,4 +1,14 @@
-import { onAuthChange, signIn, signOut, getSessionDuration, setSessionDuration } from './auth.js';
+import {
+  onAuthChange,
+  signIn,
+  signOut,
+  getSessionDuration,
+  setSessionDuration,
+  getAccessToken,
+  isLocalDevHost,
+  enableDevLocalMode,
+} from './auth.js';
+import { pickSharedFile, pickFolder, pickOwnJsonFile } from './picker.js';
 import {
   loadEntries,
   saveEntries,
@@ -21,7 +31,17 @@ import {
   loadDashboards,
   saveDashboards,
   createDashboardFolder,
+  expectedDossierNom,
   deletePhoto,
+  listIntegrationFiles,
+  loadIntegrationFile,
+  deleteIntegrationFile,
+  connectLogbookFolder,
+  createLogbookFolder,
+  isLogbookFolderConnected,
+  probeLogbookFolder,
+  loadSharedFile,
+  LOGBOOK_FOLDER_NOT_CONNECTED,
 } from './drive.js';
 import {
   createEntry,
@@ -33,12 +53,14 @@ import {
   migrateModeleContenu,
   previewContenuTexte,
   resolveTitreModele,
+  titreGroupKey,
   buildBilanRituelDuSoir,
   buildBilanMensuelRituelDuSoir,
   NIVEAUX_ACCES,
   STATUTS,
   THEMES,
   FIXED_BLOCK_KEYS,
+  validateImportedEntry,
 } from './entries.js';
 import { applyTheme, DEFAULT_THEME } from './theme.js';
 import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
@@ -51,6 +73,7 @@ const APP_VERSION = '0.1.0';
 
 const authSection = document.getElementById('auth');
 const signInButton = document.getElementById('sign-in');
+const devLocalButton = document.getElementById('dev-local-button');
 const authStatus = document.getElementById('auth-status');
 const appShell = document.getElementById('app-shell');
 const signOutButton = document.getElementById('sign-out');
@@ -65,10 +88,40 @@ appVersionEl.textContent = `Version ${APP_VERSION}`;
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
 const modelesSection = document.getElementById('modeles');
+const integrationSection = document.getElementById('integration');
+const integrationCount = document.getElementById('integration-count');
+const integrationError = document.getElementById('integration-error');
+const integrationList = document.getElementById('integration-list');
+const entryImportError = document.getElementById('entry-import-error');
+const logbookFolderConnectButton = document.getElementById('logbook-folder-connect-button');
+const logbookFolderCreateButton = document.getElementById('logbook-folder-create-button');
+const logbookFolderModalError = document.getElementById('logbook-folder-modal-error');
+const integrationProgressTitle = document.getElementById('integration-progress-title');
+const integrationProgressBar = document.getElementById('integration-progress-bar');
+const integrationProgressCount = document.getElementById('integration-progress-count');
+const mappingCorrectionList = document.getElementById('mapping-correction-list');
+const mappingCorrectionSubmit = document.getElementById('mapping-correction-submit');
+const inspectionFicheTitle = document.getElementById('inspection-fiche-title');
+const inspectionFicheDetail = document.getElementById('inspection-fiche-detail');
+const inspectionFicheMappingList = document.getElementById('inspection-fiche-mapping-list');
+const inspectionFicheIntegrerButton = document.getElementById('inspection-fiche-integrer');
+const inspectionFicheRejeterButton = document.getElementById('inspection-fiche-rejeter');
+const settingsChangeLogbookFolderButton = document.getElementById('settings-change-logbook-folder-button');
+const entryImportButton = document.getElementById('entry-import-button');
+const entryImportMenu = document.getElementById('entry-import-menu');
+const entryImportUploadButton = document.getElementById('entry-import-upload-button');
+const entryImportDriveButton = document.getElementById('entry-import-drive-button');
+const entryImportFileInput = document.getElementById('entry-import-file-input');
 const settingsSection = document.getElementById('settings');
 const partagesSection = document.getElementById('partages');
 const partagesRecusSection = document.getElementById('partages-recus');
 const modeleNewButton = document.getElementById('modele-new-button');
+const modelesExportButton = document.getElementById('modeles-export-button');
+const modelesImportButton = document.getElementById('modeles-import-button');
+const modelesImportFileInput = document.getElementById('modeles-import-file-input');
+const dashboardsExportButton = document.getElementById('dashboards-export-button');
+const dashboardsImportButton = document.getElementById('dashboards-import-button');
+const dashboardsImportFileInput = document.getElementById('dashboards-import-file-input');
 const modeleFormTitle = document.getElementById('modele-form-title');
 const modeleFormError = document.getElementById('modele-form-error');
 const entryNewButton = document.getElementById('entry-new-button');
@@ -132,6 +185,7 @@ let settings = {};
 let partages = [];
 let partagesRecus = [];
 let modeles = [];
+let integrationFiles = [];
 let editingPartageId = null;
 let editingEntryId = null;
 let editingEntryModeleId = null;
@@ -146,7 +200,7 @@ let editingModeleId = null;
 let modeleBilans = [];
 let ownerName = null;
 let currentJournalId = null;
-// Page affichée dans #main-content : 'entries' | 'modeles' | 'settings' | 'partages' | 'acces'.
+// Page affichée dans #main-content : 'entries' | 'modeles' | 'integration' | 'settings' | 'partages' | 'acces'.
 // currentJournalId prime dessus (journal partagé reçu affiché par-dessus, cf renderMainView).
 let mainView = 'entries';
 let dashboards = [];
@@ -539,6 +593,243 @@ function cloneContenuSchema(schema) {
     })),
     order: [...schema.order],
   };
+}
+
+// Reprend la structure d'un modèle en portant les valeurs de l'ancien contenu
+// (texte libre, ou tableau apparié par nom de ligne/colonne) — utilisé pour lier
+// une fiche d'import à un modèle choisi après coup, sans perdre ses données.
+// Popup de correction manuelle : un champ du modèle sans correspondance automatique par
+// nom, une liste déroulante pour choisir à quel champ importé le relier (ou le laisser
+// vide). Résout avec une Map ligne-du-modèle -> ligne-importée-choisie (ou null).
+function demanderCorrectionMappage(modeleLignesNonMappees, ancienneLignesDisponibles) {
+  return new Promise((resolve) => {
+    // Appelée pendant une intégration de groupe, la popup de progression est déjà ouverte :
+    // la remplacer temporairement par la correction puis la rouvrir, plutôt que fermer tout
+    // le système de popup (ce qui interromprait visuellement le traitement en cours).
+    const progressModalWasOpen = !document.getElementById('integration-progress-modal').hidden;
+    mappingCorrectionList.innerHTML = '';
+    const selects = new Map();
+    for (const ligne of modeleLignesNonMappees) {
+      const li = document.createElement('li');
+      const label = document.createElement('label');
+      label.textContent = ligne.nom;
+      li.appendChild(label);
+
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', `Champ importé relié à « ${ligne.nom} »`);
+      const emptyOption = document.createElement('option');
+      emptyOption.value = '';
+      emptyOption.textContent = 'Laisser vide';
+      select.appendChild(emptyOption);
+      for (const ancienneLigne of ancienneLignesDisponibles) {
+        const option = document.createElement('option');
+        option.value = ancienneLigne.id;
+        option.textContent = ancienneLigne.nom;
+        select.appendChild(option);
+      }
+      li.appendChild(select);
+      mappingCorrectionList.appendChild(li);
+      selects.set(ligne.id, select);
+    }
+
+    function onSubmit() {
+      mappingCorrectionSubmit.removeEventListener('click', onSubmit);
+      if (progressModalWasOpen) {
+        openModal('integration-progress-modal', { dismissable: false });
+      } else {
+        closeModal();
+      }
+      const corrections = new Map();
+      for (const [modeleLigneId, select] of selects) corrections.set(modeleLigneId, select.value || null);
+      resolve(corrections);
+    }
+    mappingCorrectionSubmit.addEventListener('click', onSubmit);
+    openModal('mapping-correction-modal', { dismissable: false });
+  });
+}
+
+// Bouton "Inspecter" (fiches avec mapping nécessaire ou champs en trop) : montre le
+// diff avant de choisir, plutôt qu'intégrer/rejeter à l'aveugle depuis la liste. Le
+// mappage choisi ici est mémorisé sur l'item (item.mappageCorrections) pour que
+// l'intégration elle-même ne redemande pas la même chose.
+function ouvrirInspectionFiche(item, classe) {
+  inspectionFicheTitle.textContent = `Inspection — ${item.data.titre || '(sans titre)'} (${item.data.date})`;
+  inspectionFicheDetail.innerHTML = '';
+  inspectionFicheMappingList.innerHTML = '';
+
+  const modele = modeles.find((m) => m.id === item.targetModeleId);
+  const modeleTableau = modele?.contenuSchema.blocks.find((b) => b.type === 'tableau');
+  const ancienTableau = item.data.contenuSchema.blocks.find((b) => b.type === 'tableau');
+  const selects = new Map();
+
+  if (modeleTableau && ancienTableau) {
+    const { modeleLignesNonMappees, ancienneLignesDisponibles } = analyserMappageTableau(ancienTableau, modeleTableau);
+
+    if (classe === 'champs-supplementaire') {
+      const p = document.createElement('p');
+      p.textContent = `Champs en trop dans la fiche, seront ajoutés en texte brut à l'entrée : ${ancienneLignesDisponibles.map((l) => l.nom).join(', ')}.`;
+      inspectionFicheDetail.appendChild(p);
+    } else if (classe === 'mapping-necessaire') {
+      const p = document.createElement('p');
+      p.textContent = 'Champs du modèle sans correspondance automatique : relie-les à un champ libre de la fiche si besoin.';
+      inspectionFicheDetail.appendChild(p);
+
+      const dejaChoisi = item.mappageCorrections ?? new Map();
+      for (const ligne of modeleLignesNonMappees) {
+        const li = document.createElement('li');
+        const label = document.createElement('label');
+        label.textContent = ligne.nom;
+        li.appendChild(label);
+
+        const select = document.createElement('select');
+        select.setAttribute('aria-label', `Champ importé relié à « ${ligne.nom} »`);
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'Laisser vide';
+        select.appendChild(emptyOption);
+        for (const ancienneLigne of ancienneLignesDisponibles) {
+          const option = document.createElement('option');
+          option.value = ancienneLigne.id;
+          option.textContent = ancienneLigne.nom;
+          select.appendChild(option);
+        }
+        select.value = dejaChoisi.get(ligne.id) ?? '';
+        li.appendChild(select);
+        inspectionFicheMappingList.appendChild(li);
+        selects.set(ligne.id, select);
+      }
+    }
+  }
+
+  function cleanup() {
+    inspectionFicheIntegrerButton.removeEventListener('click', onIntegrer);
+    inspectionFicheRejeterButton.removeEventListener('click', onRejeter);
+  }
+  function onIntegrer() {
+    cleanup();
+    if (selects.size > 0) {
+      const corrections = new Map();
+      for (const [ligneId, select] of selects) if (select.value) corrections.set(ligneId, select.value);
+      item.mappageCorrections = corrections;
+    }
+    closeModal();
+    integrerFichierEnAttente(item);
+  }
+  function onRejeter() {
+    cleanup();
+    closeModal();
+    rejeterFichier(item);
+  }
+  inspectionFicheIntegrerButton.addEventListener('click', onIntegrer);
+  inspectionFicheRejeterButton.addEventListener('click', onRejeter);
+
+  openModal('inspection-fiche-modal');
+}
+
+function trouverAncienBlock(ancienSchema, block) {
+  return (
+    ancienSchema.blocks.find((b) => b.type === block.type && b.titre === block.titre) ??
+    ancienSchema.blocks.find((b) => b.type === block.type) ??
+    null
+  );
+}
+
+// Correspondances automatiques par nom de ligne entre le tableau importé et celui du
+// modèle. Ce qui ne matche pas par nom (clés différentes pour la même mesure) reste à
+// trancher manuellement : cf demanderCorrectionMappage.
+function analyserMappageTableau(ancienBlock, modeleBlock) {
+  const correspondances = new Map(); // ligne du modèle (id) -> ligne importée (id)
+  const ancienneLignesUtilisees = new Set();
+  for (const ligne of modeleBlock.lignes) {
+    const ancienneLigne = ancienBlock.lignes.find((l) => l.nom === ligne.nom);
+    if (ancienneLigne) {
+      correspondances.set(ligne.id, ancienneLigne.id);
+      ancienneLignesUtilisees.add(ancienneLigne.id);
+    }
+  }
+  return {
+    correspondances,
+    modeleLignesNonMappees: modeleBlock.lignes.filter((l) => !correspondances.has(l.id)),
+    ancienneLignesDisponibles: ancienBlock.lignes.filter((l) => !ancienneLignesUtilisees.has(l.id)),
+  };
+}
+
+// Applique les correspondances (auto + corrections manuelles) et renvoie en plus les
+// lignes importées jamais reliées — pour les reporter en texte brut dans l'entrée.
+function appliquerMappageTableau(ancienBlock, ancienVals, modeleBlock, correspondances) {
+  const valeurs = {};
+  for (const ligne of modeleBlock.lignes) {
+    const ancienneLigne = ancienBlock.lignes.find((l) => l.id === correspondances.get(ligne.id));
+    const rowVals = {};
+    // Le repli sur la 1re colonne importée ne vaut que pour la 1re colonne du modèle (la
+    // mesure elle-même, souvent nommée différemment) — sinon une colonne du modèle sans
+    // équivalent nommé (ex. "Commentaire") recopierait à tort la valeur de "Valeur".
+    modeleBlock.colonnes.forEach((colonne, index) => {
+      const ancienneColonne =
+        ancienBlock.colonnes.find((c) => c.nom === colonne.nom) ?? (index === 0 ? ancienBlock.colonnes[0] : null);
+      rowVals[colonne.id] = ancienneLigne && ancienneColonne ? (ancienVals[ancienneLigne.id]?.[ancienneColonne.id] ?? '') : '';
+    });
+    valeurs[ligne.id] = rowVals;
+  }
+  const lignesUtilisees = new Set(correspondances.values());
+  const nonUtilisees = ancienBlock.lignes
+    .filter((l) => !lignesUtilisees.has(l.id))
+    .map((l) => ({ nom: l.nom, valeur: Object.values(ancienVals[l.id] ?? {}).filter(Boolean).join(' / ') }));
+  // Une ligne du modèle reste vide si aucune colonne n'a reçu de valeur (pas de
+  // correspondance, ou correspondance vers une case elle-même vide) — sert à décider le
+  // statut de l'entrée après intégration (cf remapContenuVersModele).
+  const aUneLigneVide = modeleBlock.lignes.some((ligne) => Object.values(valeurs[ligne.id]).every((v) => v === ''));
+  return { valeurs, nonUtilisees, aUneLigneVide };
+}
+
+// correctionsExternes : déjà choisies via le bouton Inspecter (Map ligne-modèle ->
+// ligne-importée) — évite de redemander le mappage pendant l'intégration elle-même.
+// Si absentes (intégration groupée sans passer par l'inspection), retombe sur la
+// popup de correction automatique, comme avant.
+async function remapContenuVersModele(ancienSchema, ancienValeurs, modele, correctionsExternes) {
+  const schema = cloneContenuSchema(modele.contenuSchema);
+  const valeurs = structuredClone(modele.contenuValeursParDefaut ?? {});
+  const nonMappees = [];
+  let champsVides = false;
+
+  for (const block of schema.blocks) {
+    const ancienBlock = trouverAncienBlock(ancienSchema, block);
+    if (!ancienBlock) continue;
+    if (block.type === 'texte') {
+      valeurs[block.id] = ancienValeurs[ancienBlock.id] ?? '';
+    } else if (block.type === 'tableau') {
+      const ancienVals = ancienValeurs[ancienBlock.id] ?? {};
+      const { correspondances, modeleLignesNonMappees, ancienneLignesDisponibles } = analyserMappageTableau(ancienBlock, block);
+      if (modeleLignesNonMappees.length > 0 && ancienneLignesDisponibles.length > 0) {
+        const corrections = correctionsExternes ?? (await demanderCorrectionMappage(modeleLignesNonMappees, ancienneLignesDisponibles));
+        for (const [modeleLigneId, ancienneLigneId] of corrections) {
+          if (ancienneLigneId) correspondances.set(modeleLigneId, ancienneLigneId);
+        }
+      }
+      const { valeurs: lignesVals, nonUtilisees, aUneLigneVide } = appliquerMappageTableau(ancienBlock, ancienVals, block, correspondances);
+      valeurs[block.id] = lignesVals;
+      nonMappees.push(...nonUtilisees);
+      if (aUneLigneVide) champsVides = true;
+    }
+  }
+
+  // Les clés importées jamais reliées à un champ du modèle (ni automatiquement, ni par
+  // l'utilisateur) ne doivent pas disparaître : elles sont ajoutées en texte brut plutôt
+  // que silencieusement perdues.
+  if (nonMappees.length > 0) {
+    const brut = nonMappees.map(({ nom, valeur }) => `${nom} : ${valeur}`).join('\n');
+    const texteBlock = schema.blocks.find((b) => b.type === 'texte');
+    if (texteBlock) {
+      valeurs[texteBlock.id] = [valeurs[texteBlock.id], brut].filter(Boolean).join('\n\n');
+    } else {
+      const id = crypto.randomUUID();
+      schema.blocks.push({ id, type: 'texte', titre: 'Champs non reliés au modèle' });
+      schema.order.push(id);
+      valeurs[id] = brut;
+    }
+  }
+
+  return { contenuSchema: schema, contenuValeurs: valeurs, champsVides };
 }
 
 const BILAN_BUILDERS = {
@@ -1077,10 +1368,670 @@ modeleForm.addEventListener('submit', async (event) => {
   }
 });
 
+let integrationLoading = false;
+let integrationTotal = 0;
+// Groupes (par clé de titre généralisée, ou "clé::sous-groupe" pour un sous-groupe)
+// repliés par l'utilisateur — persiste tant que la clé ne change pas, même quand la
+// liste se re-rend après une sélection.
+const collapsedGroupKeys = new Set();
+// Une fois choisi au niveau du groupe, le sélecteur individuel correspondant (tableau
+// ou modèle) disparaît pour chaque fiche du groupe — redondant une fois la destination
+// commune fixée. Remis à zéro seulement par un rechargement complet de la liste.
+const groupeDashboardChoisi = new Set();
+const groupeModeleChoisi = new Set();
+// Un seul essai de détection auto par groupe (pas à chaque re-rendu), pour ne pas
+// réappliquer le modèle détecté après que l'utilisateur l'ait explicitement remis à
+// "Garder tel quel".
+const groupeModeleAutoDetecteTente = new Set();
+
+function appendDashboardOptions(select, dashboardsActifs, placeholder) {
+  const emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = placeholder;
+  select.appendChild(emptyOption);
+  for (const dashboard of dashboardsActifs) {
+    const option = document.createElement('option');
+    option.value = dashboard.id;
+    option.textContent = dashboard.nom;
+    select.appendChild(option);
+  }
+}
+
+function appendModeleOptions(select, placeholder) {
+  const emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = placeholder;
+  select.appendChild(emptyOption);
+  for (const modele of modeles) {
+    const option = document.createElement('option');
+    option.value = modele.id;
+    option.textContent = modele.nom;
+    select.appendChild(option);
+  }
+}
+
+function renderIntegrationItemRow(item, dashboardsActifs, { hideDashboardSelect = false, hideModeleSelect = false } = {}) {
+  const li = document.createElement('li');
+
+  const nom = document.createElement('p');
+  nom.textContent = item.error ? `${item.name} — ${item.error}` : `${item.data.titre || '(sans titre)'} (${item.data.date})`;
+  li.appendChild(nom);
+
+  // Détail (champs en trop / introuvables) : visible avant de choisir d'intégrer ou de
+  // rejeter, pas seulement après coup via le texte brut ajouté à l'intégration.
+  const { classe, detail } = item.error ? { classe: null, detail: null } : classerFiche(item);
+  // Mapping nécessaire ou champs en trop : décision à prendre en connaissance de cause,
+  // via l'inspection, plutôt qu'intégrer/rejeter à l'aveugle depuis la liste.
+  const besoinInspection = classe === 'mapping-necessaire' || classe === 'champs-supplementaire';
+  if (detail) {
+    const detailEl = document.createElement('p');
+    detailEl.className = 'integration-item-detail';
+    detailEl.textContent = detail;
+    li.appendChild(detailEl);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'partage-actions';
+
+  let integrerButton;
+
+  if (hideDashboardSelect) {
+    const dashboardNom = dashboardsActifs.find((d) => d.id === item.targetDashboardId)?.nom ?? '';
+    const span = document.createElement('span');
+    span.textContent = dashboardNom;
+    actions.appendChild(span);
+  } else {
+    const dashboardSelect = document.createElement('select');
+    dashboardSelect.setAttribute('aria-label', 'Tableau de bord de destination');
+    appendDashboardOptions(dashboardSelect, dashboardsActifs, 'Choisir un tableau…');
+    dashboardSelect.value = item.targetDashboardId ?? '';
+    dashboardSelect.disabled = Boolean(item.error);
+    dashboardSelect.addEventListener('change', () => {
+      item.targetDashboardId = dashboardSelect.value || null;
+      integrerButton.disabled = Boolean(item.error) || !item.targetDashboardId;
+    });
+    actions.appendChild(dashboardSelect);
+  }
+
+  if (hideModeleSelect) {
+    const modeleNomTexte = modeles.find((m) => m.id === item.targetModeleId)?.nom ?? 'Garder tel quel';
+    const span = document.createElement('span');
+    span.textContent = modeleNomTexte;
+    actions.appendChild(span);
+  } else {
+    const modeleSelect = document.createElement('select');
+    modeleSelect.setAttribute('aria-label', 'Lier au modèle');
+    appendModeleOptions(modeleSelect, 'Garder tel quel');
+    modeleSelect.value =
+      item.targetModeleId ?? (modeles.some((m) => m.id === item.data?.modeleId) ? item.data.modeleId : '');
+    modeleSelect.disabled = Boolean(item.error);
+    modeleSelect.addEventListener('change', () => {
+      item.targetModeleId = modeleSelect.value || null;
+    });
+    actions.appendChild(modeleSelect);
+  }
+
+  if (besoinInspection) {
+    const inspecterButton = document.createElement('button');
+    inspecterButton.type = 'button';
+    inspecterButton.textContent = 'Inspecter';
+    inspecterButton.disabled = Boolean(item.error) || !item.targetDashboardId;
+    inspecterButton.addEventListener('click', () => ouvrirInspectionFiche(item, classe));
+    actions.appendChild(inspecterButton);
+    // Pas de bouton Intégrer direct ici : nécessaire seulement pour satisfaire la
+    // fermeture de la variable `integrerButton` utilisée par le select de tableau plus haut.
+    integrerButton = inspecterButton;
+  } else {
+    integrerButton = document.createElement('button');
+    integrerButton.type = 'button';
+    integrerButton.textContent = 'Intégrer';
+    integrerButton.disabled = Boolean(item.error) || !item.targetDashboardId;
+    integrerButton.addEventListener('click', () => integrerFichierEnAttente(item));
+    actions.appendChild(integrerButton);
+
+    const rejeterButton = document.createElement('button');
+    rejeterButton.type = 'button';
+    rejeterButton.className = 'button-danger';
+    rejeterButton.textContent = 'Rejeter';
+    rejeterButton.addEventListener('click', () => rejeterFichierEnAttente(item));
+    actions.appendChild(rejeterButton);
+  }
+
+  li.appendChild(actions);
+  return li;
+}
+
+// Classe une fiche par rapport au modèle choisi pour elle, pour le sous-groupage dans
+// le groupe de titre : 'correspondante' (tout matche), 'champs-supplementaire' (tous
+// les champs du modèle sont trouvés, mais la fiche en a d'autres en trop) ou
+// 'mapping-necessaire' (des champs du modèle sont introuvables ET des champs libres de
+// la fiche pourraient leur être reliés manuellement). classe null = pas de modèle choisi
+// pour cette fiche, ou rien à comparer (pas de tableau des deux côtés). `detail` : à
+// afficher sur la fiche pour voir en un coup d'œil ce qui est en trop/manquant avant de
+// choisir d'intégrer ou de rejeter.
+function classerFiche(item) {
+  if (item.error || !item.targetModeleId) return { classe: null, detail: null };
+  const modele = modeles.find((m) => m.id === item.targetModeleId);
+  const modeleTableau = modele?.contenuSchema.blocks.find((b) => b.type === 'tableau');
+  const ancienTableau = item.data.contenuSchema.blocks.find((b) => b.type === 'tableau');
+  if (!modele || !modeleTableau || !ancienTableau) return { classe: 'correspondante', detail: null };
+  const { modeleLignesNonMappees, ancienneLignesDisponibles } = analyserMappageTableau(ancienTableau, modeleTableau);
+  const manquants = modeleLignesNonMappees.map((l) => l.nom);
+  const enTrop = ancienneLignesDisponibles.map((l) => l.nom);
+  if (manquants.length === 0 && enTrop.length === 0) return { classe: 'correspondante', detail: null };
+  if (manquants.length === 0) return { classe: 'champs-supplementaire', detail: `Champs en trop : ${enTrop.join(', ')}` };
+  if (enTrop.length > 0) {
+    return {
+      classe: 'mapping-necessaire',
+      detail: `Champs du modèle introuvables : ${manquants.join(', ')} — champs libres : ${enTrop.join(', ')}`,
+    };
+  }
+  return { classe: 'correspondante', detail: `Champs du modèle sans valeur : ${manquants.join(', ')}` };
+}
+
+// Clé spéciale pour regrouper à part les fichiers invalides (pas de titre à
+// généraliser, et les actions de groupe — modèle, intégration groupée — n'ont pas
+// de sens pour eux).
+const ERROR_GROUP_KEY = Symbol('integration-error-group');
+
+function groupIntegrationFiles(files) {
+  const groups = new Map();
+  for (const item of files) {
+    const key = item.error ? ERROR_GROUP_KEY : titreGroupKey(item.data.titre);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return groups;
+}
+
+function renderIntegrationList() {
+  if (integrationFiles.length === 0) {
+    integrationCount.textContent = integrationLoading ? `Chargement… 0/${integrationTotal}` : '';
+    renderListMessage(integrationList, integrationLoading ? 'Chargement…' : 'Aucune entrée en attente d\'intégration.');
+    return;
+  }
+  integrationCount.textContent = integrationLoading
+    ? `Chargement… ${integrationFiles.length}/${integrationTotal}`
+    : `${integrationFiles.length} fiche(s) à intégrer.`;
+  integrationList.innerHTML = '';
+  const dashboardsActifs = dashboards.filter((d) => !d.archive);
+  for (const [key, items] of groupIntegrationFiles(integrationFiles)) {
+    const groupLi = document.createElement('li');
+    groupLi.className = 'integration-group';
+
+    const collapsed = collapsedGroupKeys.has(key);
+
+    const header = document.createElement('div');
+    header.className = 'integration-group-header';
+
+    const titreRow = document.createElement('div');
+    titreRow.className = 'integration-group-title-row';
+
+    const toggleButton = document.createElement('button');
+    toggleButton.type = 'button';
+    toggleButton.className = 'integration-group-toggle';
+    toggleButton.setAttribute('aria-expanded', String(!collapsed));
+    toggleButton.setAttribute('aria-label', collapsed ? 'Déplier le groupe' : 'Replier le groupe');
+    toggleButton.textContent = collapsed ? '▸' : '▾';
+    toggleButton.addEventListener('click', () => {
+      if (collapsedGroupKeys.has(key)) collapsedGroupKeys.delete(key);
+      else collapsedGroupKeys.add(key);
+      renderIntegrationList();
+    });
+    titreRow.appendChild(toggleButton);
+
+    const titre = document.createElement('p');
+    titre.textContent =
+      key === ERROR_GROUP_KEY
+        ? `Fichiers en erreur (${items.length})`
+        : `${key || '(sans titre)'} — ${items.length} fiche(s)`;
+    titreRow.appendChild(titre);
+    header.appendChild(titreRow);
+
+    if (key !== ERROR_GROUP_KEY) {
+      // Si au moins une fiche du groupe porte déjà un modeleId connu (import déjà lié à
+      // un modèle existant), le proposer par défaut pour tout le groupe plutôt que de
+      // repartir sur "Garder tel quel" — un seul essai, pour ne pas revenir dessus après
+      // un choix explicite de l'utilisateur.
+      // Attendre la fin du chargement par lots : sinon le premier lot (incomplet) ne
+      // trouverait pas encore la fiche porteuse du modeleId et verrouillerait "aucun
+      // modèle détecté" avant même que les lots suivants n'arrivent.
+      if (!groupeModeleAutoDetecteTente.has(key) && !integrationLoading) {
+        groupeModeleAutoDetecteTente.add(key);
+        const modeleIdDetecte = items.map((i) => i.data?.modeleId).find((id) => id && modeles.some((m) => m.id === id));
+        if (modeleIdDetecte && !groupeModeleChoisi.has(key)) {
+          for (const item of items) {
+            if (item.targetModeleId === undefined) item.targetModeleId = modeleIdDetecte;
+          }
+          groupeModeleChoisi.add(key);
+        }
+      }
+
+      const groupActions = document.createElement('div');
+      groupActions.className = 'partage-actions';
+
+      const groupDashboardSelect = document.createElement('select');
+      groupDashboardSelect.setAttribute('aria-label', 'Tableau de bord de destination pour le groupe');
+      appendDashboardOptions(groupDashboardSelect, dashboardsActifs, 'Choisir un tableau pour le groupe…');
+      groupDashboardSelect.addEventListener('change', () => {
+        for (const item of items) item.targetDashboardId = groupDashboardSelect.value || null;
+        if (groupDashboardSelect.value) groupeDashboardChoisi.add(key);
+        else groupeDashboardChoisi.delete(key);
+        renderIntegrationList();
+      });
+      groupActions.appendChild(groupDashboardSelect);
+
+      const groupModeleSelect = document.createElement('select');
+      groupModeleSelect.setAttribute('aria-label', 'Lier le groupe à un modèle');
+      appendModeleOptions(groupModeleSelect, 'Garder tel quel');
+      groupModeleSelect.value = groupeModeleChoisi.has(key) ? (items.find((i) => i.targetModeleId)?.targetModeleId ?? '') : '';
+      groupModeleSelect.addEventListener('change', () => {
+        for (const item of items) item.targetModeleId = groupModeleSelect.value || null;
+        if (groupModeleSelect.value) groupeModeleChoisi.add(key);
+        else groupeModeleChoisi.delete(key);
+        renderIntegrationList();
+      });
+      groupActions.appendChild(groupModeleSelect);
+
+      const integrerGroupeButton = document.createElement('button');
+      integrerGroupeButton.type = 'button';
+      integrerGroupeButton.textContent = 'Intégrer le groupe';
+      integrerGroupeButton.addEventListener('click', () => integrerGroupe(items));
+      groupActions.appendChild(integrerGroupeButton);
+
+      const rejeterGroupeButton = document.createElement('button');
+      rejeterGroupeButton.type = 'button';
+      rejeterGroupeButton.className = 'button-danger';
+      rejeterGroupeButton.textContent = 'Rejeter le groupe';
+      rejeterGroupeButton.addEventListener('click', () => rejeterGroupe(items));
+      groupActions.appendChild(rejeterGroupeButton);
+
+      header.appendChild(groupActions);
+    }
+    groupLi.appendChild(header);
+
+    const body = document.createElement('div');
+    body.hidden = collapsed;
+
+    // Sous-groupage uniquement si les fiches du groupe ne sont pas toutes dans le même
+    // cas (ex. toutes "correspondante", ou aucun modèle choisi nulle part) : pas de
+    // sous-titres inutiles tant qu'il n'y a rien à distinguer.
+    const classements = key === ERROR_GROUP_KEY ? [] : items.map((item) => ({ item, classe: classerFiche(item).classe }));
+    const sousGroupageUtile = key !== ERROR_GROUP_KEY && new Set(classements.map((c) => c.classe)).size > 1;
+
+    const itemRowOptions = {
+      hideDashboardSelect: groupeDashboardChoisi.has(key),
+      hideModeleSelect: groupeModeleChoisi.has(key),
+    };
+
+    function appendItemList(container, itemsASuivre) {
+      const itemList = document.createElement('ul');
+      itemList.className = 'card-list';
+      for (const item of itemsASuivre) itemList.appendChild(renderIntegrationItemRow(item, dashboardsActifs, itemRowOptions));
+      container.appendChild(itemList);
+    }
+
+    if (!sousGroupageUtile) {
+      appendItemList(body, items);
+    } else {
+      const SOUS_GROUPES = [
+        { classe: 'correspondante', label: 'Correspondante' },
+        { classe: 'champs-supplementaire', label: 'Champs supplémentaire' },
+        { classe: 'mapping-necessaire', label: 'Mapping nécessaire' },
+        { classe: null, label: 'Garder tel quel' },
+      ];
+      for (const { classe, label } of SOUS_GROUPES) {
+        const subItems = classements.filter((c) => c.classe === classe).map((c) => c.item);
+        if (subItems.length === 0) continue;
+        const subKey = `${String(key)}::${classe}`;
+        const subCollapsed = collapsedGroupKeys.has(subKey);
+
+        const subHeader = document.createElement('div');
+        subHeader.className = 'integration-subgroup-header';
+
+        const subToggleButton = document.createElement('button');
+        subToggleButton.type = 'button';
+        subToggleButton.className = 'integration-group-toggle';
+        subToggleButton.setAttribute('aria-expanded', String(!subCollapsed));
+        subToggleButton.setAttribute('aria-label', subCollapsed ? 'Déplier le sous-groupe' : 'Replier le sous-groupe');
+        subToggleButton.textContent = subCollapsed ? '▸' : '▾';
+        subToggleButton.addEventListener('click', () => {
+          if (collapsedGroupKeys.has(subKey)) collapsedGroupKeys.delete(subKey);
+          else collapsedGroupKeys.add(subKey);
+          renderIntegrationList();
+        });
+        subHeader.appendChild(subToggleButton);
+
+        const subTitre = document.createElement('p');
+        subTitre.textContent = `${label} (${subItems.length})`;
+        subHeader.appendChild(subTitre);
+
+        const subActions = document.createElement('div');
+        subActions.className = 'partage-actions';
+
+        const integrerSousGroupeButton = document.createElement('button');
+        integrerSousGroupeButton.type = 'button';
+        integrerSousGroupeButton.textContent = 'Intégrer le sous-groupe';
+        integrerSousGroupeButton.addEventListener('click', () => integrerGroupe(subItems));
+        subActions.appendChild(integrerSousGroupeButton);
+
+        const rejeterSousGroupeButton = document.createElement('button');
+        rejeterSousGroupeButton.type = 'button';
+        rejeterSousGroupeButton.className = 'button-danger';
+        rejeterSousGroupeButton.textContent = 'Rejeter le sous-groupe';
+        rejeterSousGroupeButton.addEventListener('click', () => rejeterGroupe(subItems));
+        subActions.appendChild(rejeterSousGroupeButton);
+
+        subHeader.appendChild(subActions);
+
+        body.appendChild(subHeader);
+
+        const subBody = document.createElement('div');
+        subBody.hidden = subCollapsed;
+        appendItemList(subBody, subItems);
+        body.appendChild(subBody);
+      }
+    }
+    groupLi.appendChild(body);
+
+    integrationList.appendChild(groupLi);
+  }
+}
+
+const INTEGRATION_BATCH_SIZE = 5;
+
+async function loadIntegrationFiles() {
+  integrationError.textContent = '';
+  integrationFiles = [];
+  integrationTotal = 0;
+  integrationLoading = true;
+  renderIntegrationList();
+  try {
+    const files = await listIntegrationFiles();
+    integrationTotal = files.length;
+    const dashboardsActifs = dashboards.filter((d) => !d.archive);
+    // Un seul tableau de bord : pas d'ambiguïté possible, on le présélectionne.
+    // Plusieurs : le sélecteur reste vide pour forcer un choix explicite.
+    const defaultDashboardId = dashboardsActifs.length === 1 ? dashboardsActifs[0].id : null;
+    // Par lots pour afficher les résultats au fur et à mesure plutôt que d'attendre
+    // que tous les fichiers (potentiellement nombreux) soient chargés d'un coup.
+    for (let i = 0; i < files.length; i += INTEGRATION_BATCH_SIZE) {
+      const batch = files.slice(i, i + INTEGRATION_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (file) => {
+          try {
+            const data = await loadIntegrationFile(file.id);
+            const error = validateImportedEntry(data);
+            return { id: file.id, name: file.name, data, error, targetDashboardId: defaultDashboardId };
+          } catch (err) {
+            return { id: file.id, name: file.name, data: null, error: err.message, targetDashboardId: defaultDashboardId };
+          }
+        }),
+      );
+      integrationFiles = [...integrationFiles, ...batchResults];
+      renderIntegrationList();
+    }
+  } catch (error) {
+    integrationFiles = [];
+    integrationError.textContent =
+      error.message === LOGBOOK_FOLDER_NOT_CONNECTED
+        ? 'Connecte d\'abord ton dossier Logbook avec le bouton ci-dessus.'
+        : `Échec du chargement : ${error.message}`;
+  }
+  integrationLoading = false;
+  renderIntegrationList();
+}
+
+async function integrerFichierEnAttente(item) {
+  integrationError.textContent = '';
+  if (!item.targetDashboardId) {
+    integrationError.textContent = 'Choisis un tableau de bord de destination.';
+    return;
+  }
+  try {
+    let data = item.data;
+    if (item.targetModeleId) {
+      const modele = modeles.find((m) => m.id === item.targetModeleId);
+      if (modele) {
+        const classe = classerFiche(item).classe;
+        const { contenuSchema, contenuValeurs, champsVides } = await remapContenuVersModele(
+          data.contenuSchema,
+          data.contenuValeurs,
+          modele,
+          item.mappageCorrections,
+        );
+        // Un champ du modèle resté vide prime sur tout le reste (l'entrée n'est pas
+        // utilisable telle quelle) ; sinon, une fiche qui a eu besoin d'un mappage ou qui
+        // avait des champs en trop mérite une relecture même si tout a pu être rempli.
+        let statut = data.statut;
+        if (champsVides) statut = 'A Compléter';
+        else if (classe === 'champs-supplementaire' || classe === 'mapping-necessaire') statut = 'A Valider';
+        data = { ...data, modeleId: modele.id, contenuSchema, contenuValeurs, statut };
+      }
+    }
+    if (item.targetDashboardId === activeDashboardId) {
+      if (entries.some((e) => e.id === data.id)) {
+        integrationError.textContent = 'Une entrée avec ce id existe déjà dans le journal.';
+        return;
+      }
+      const previousEntries = entries;
+      entries = [...entries, data];
+      try {
+        await saveEntries(entries);
+      } catch (error) {
+        entries = previousEntries;
+        throw error;
+      }
+      renderEntries();
+    } else {
+      const targetEntries = await loadEntries(item.targetDashboardId);
+      if (targetEntries.some((e) => e.id === data.id)) {
+        integrationError.textContent = 'Une entrée avec ce id existe déjà dans ce tableau de bord.';
+        return;
+      }
+      await saveEntries([...targetEntries, data], item.targetDashboardId);
+    }
+    await deleteIntegrationFile(item.id);
+    integrationFiles = integrationFiles.filter((f) => f.id !== item.id);
+    renderIntegrationList();
+  } catch (error) {
+    integrationError.textContent = `Échec de l'intégration : ${error.message}`;
+  }
+}
+
+// Popup non fermable pendant la boucle : la liste d'intégration et les entrées sont
+// mutées en mémoire au fil des items, une action concurrente (changer de tableau de
+// bord, éditer une entrée) pendant ce traitement lirait/écrirait un état à moitié à jour.
+async function traiterParLots(items, titre, traiterItem) {
+  openModal('integration-progress-modal', { dismissable: false });
+  integrationProgressTitle.textContent = titre;
+  integrationProgressBar.max = items.length;
+  integrationProgressBar.value = 0;
+  integrationProgressCount.textContent = `0 / ${items.length}`;
+  for (const item of items) {
+    await traiterItem(item);
+    integrationProgressBar.value += 1;
+    integrationProgressCount.textContent = `${integrationProgressBar.value} / ${items.length}`;
+  }
+  closeModal();
+}
+
+async function rejeterFichier(item) {
+  integrationError.textContent = '';
+  try {
+    await deleteIntegrationFile(item.id);
+    integrationFiles = integrationFiles.filter((f) => f.id !== item.id);
+    renderIntegrationList();
+  } catch (error) {
+    integrationError.textContent = `Échec du rejet : ${error.message}`;
+  }
+}
+
+async function rejeterFichierEnAttente(item) {
+  if (!window.confirm(`Rejeter définitivement « ${item.name} » sans l'intégrer ?`)) return;
+  await rejeterFichier(item);
+}
+
+// Une seule confirmation pour tout le groupe plutôt qu'une popup par fiche.
+async function rejeterGroupe(items) {
+  if (!window.confirm(`Rejeter définitivement ces ${items.length} fiche(s) sans les intégrer ?`)) return;
+  await traiterParLots([...items], 'Rejet en cours…', rejeterFichier);
+}
+
+async function integrerGroupe(items) {
+  const eligibles = items.filter((item) => !item.error && item.targetDashboardId);
+  if (eligibles.length === 0) return;
+  await traiterParLots(eligibles, 'Intégration en cours…', integrerFichierEnAttente);
+}
+
+// Id du dossier Application détecté par probeLogbookFolder (cf openLogbookFolderModal),
+// pour ouvrir le Picker directement dedans plutôt qu'à la racine du Drive.
+let probedAppFolderId = null;
+
+// Avant d'afficher la popup : sonde si Application/Logbook est déjà visible de
+// l'app (créé par elle plus tôt, ou déjà connecté une fois). Si on retrouve sans
+// ambiguïté le dossier (même nom, même emplacement attendu), on s'y reconnecte
+// directement sans bloquer sur la popup — celle-ci ne reste nécessaire que pour
+// le vrai premier usage (rien trouvé, cf probeLogbookFolder dans drive.js : un
+// dossier existant mais jamais vu par l'app reste indétectable, d'où le bouton
+// Créer qui reste la solution de repli dans ce cas).
+async function openLogbookFolderModal() {
+  logbookFolderModalError.textContent = '';
+  let found = false;
+  try {
+    const probe = await probeLogbookFolder();
+    found = probe.found;
+    probedAppFolderId = probe.appFolderId;
+    if (found) {
+      await connectLogbookFolder(probe.logbookFolderId);
+      await loadAccountAndDashboards();
+      if (mainView === 'integration') await loadIntegrationFiles();
+      return;
+    }
+  } catch {
+    probedAppFolderId = null;
+  }
+  logbookFolderConnectButton.hidden = !found;
+  logbookFolderCreateButton.hidden = found;
+  openModal('logbook-folder-modal');
+}
+
+// Toutes les données de l'app (dashboards, entrées, modèles, entries_to_import)
+// dépendent désormais du dossier Logbook connecté (cf getAppFolderId dans
+// drive.js) : (re)connecter un dossier doit donc tout recharger depuis ce
+// nouveau dossier, pas juste la liste d'intégration.
+logbookFolderConnectButton.addEventListener('click', async () => {
+  logbookFolderModalError.textContent = '';
+  try {
+    const folderId = await pickFolder(getAccessToken(), probedAppFolderId);
+    await connectLogbookFolder(folderId);
+    closeModal();
+    await loadAccountAndDashboards();
+    if (mainView === 'integration') await loadIntegrationFiles();
+  } catch (error) {
+    logbookFolderModalError.textContent = error.message;
+  }
+});
+
+// Pas de dossier Logbook existant à pointer (premier usage) : l'app crée et
+// connecte elle-même Application/Logbook, sans passer par le Picker.
+logbookFolderCreateButton.addEventListener('click', async () => {
+  logbookFolderModalError.textContent = '';
+  try {
+    await createLogbookFolder();
+    closeModal();
+    await loadAccountAndDashboards();
+  } catch (error) {
+    logbookFolderModalError.textContent = error.message;
+  }
+});
+
+settingsChangeLogbookFolderButton.addEventListener('click', openLogbookFolderModal);
+
+function closeEntryImportMenu() {
+  entryImportMenu.hidden = true;
+  entryImportButton.setAttribute('aria-expanded', 'false');
+}
+
+function toggleEntryImportMenu() {
+  const willOpen = entryImportMenu.hidden;
+  entryImportMenu.hidden = !willOpen;
+  entryImportButton.setAttribute('aria-expanded', String(willOpen));
+}
+
+entryImportButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  toggleEntryImportMenu();
+});
+
+document.addEventListener('click', (event) => {
+  if (!entryImportMenu.hidden && !event.target.closest('#entry-import-wrapper')) closeEntryImportMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !entryImportMenu.hidden) closeEntryImportMenu();
+});
+
+entryImportUploadButton.addEventListener('click', () => {
+  closeEntryImportMenu();
+  entryImportFileInput.click();
+});
+
+// Importé depuis le journal d'un jdb précis (bouton "Importer" à côté de "+
+// Nouvelle entrée") : contrairement à la liste d'attente (fichiers déposés sur le
+// Drive par un tiers, où le jdb cible est ambigu), ici le contexte est déjà celui
+// du jdb affiché, donc l'entrée y est ajoutée directement, sans détour.
+async function integrerEntreeDirecte(data) {
+  entryImportError.textContent = '';
+  const error = validateImportedEntry(data);
+  if (error) {
+    entryImportError.textContent = error;
+    return;
+  }
+  if (entries.some((e) => e.id === data.id)) {
+    entryImportError.textContent = 'Une entrée avec ce id existe déjà dans ce journal.';
+    return;
+  }
+  const previousEntries = entries;
+  entries = [...entries, data];
+  try {
+    await saveEntries(entries);
+    await syncPartages();
+    renderEntries();
+  } catch (err) {
+    entries = previousEntries;
+    entryImportError.textContent = `Échec de l'import : ${err.message}`;
+  }
+}
+
+entryImportFileInput.addEventListener('change', async () => {
+  const file = entryImportFileInput.files[0];
+  entryImportFileInput.value = '';
+  if (!file) return;
+  entryImportError.textContent = '';
+  try {
+    await integrerEntreeDirecte(JSON.parse(await file.text()));
+  } catch (error) {
+    entryImportError.textContent = `Fichier illisible : ${error.message}`;
+  }
+});
+
+entryImportDriveButton.addEventListener('click', async () => {
+  closeEntryImportMenu();
+  entryImportError.textContent = '';
+  try {
+    const fileId = await pickOwnJsonFile(getAccessToken());
+    await integrerEntreeDirecte(await loadSharedFile(fileId));
+  } catch (error) {
+    entryImportError.textContent = error.message;
+  }
+});
+
 function renderMainView() {
   entriesSection.hidden = true;
   journalPartageSection.hidden = true;
   modelesSection.hidden = true;
+  integrationSection.hidden = true;
   settingsSection.hidden = true;
   partagesSection.hidden = true;
   partagesRecusSection.hidden = true;
@@ -1090,6 +2041,8 @@ function renderMainView() {
   // rien, puisque ce bloc resterait sur journalPartageSection.
   if (mainView === 'modeles') {
     modelesSection.hidden = false;
+  } else if (mainView === 'integration') {
+    integrationSection.hidden = false;
   } else if (mainView === 'settings') {
     settingsSection.hidden = false;
   } else if (mainView === 'partages') {
@@ -1154,6 +2107,12 @@ initSidebar({
     renderMainView();
     closeSidebarOnMobile();
   },
+  onOpenIntegration: () => {
+    mainView = 'integration';
+    renderMainView();
+    loadIntegrationFiles();
+    closeSidebarOnMobile();
+  },
   onSelectDashboard: switchDashboard,
   onCreateDashboard: createDashboard,
   onRenameDashboard: renameDashboard,
@@ -1167,8 +2126,93 @@ modeleNewButton.addEventListener('click', () => {
   openModal('modele-form-modal');
 });
 
+function downloadJson(data, fileName) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+modelesExportButton.addEventListener('click', () => {
+  downloadJson(modeles, `logbook-templates-${new Date().toISOString().slice(0, 10)}.json`);
+});
+
+dashboardsExportButton.addEventListener('click', () => {
+  downloadJson(dashboards, `logbook-dashboards-${new Date().toISOString().slice(0, 10)}.json`);
+});
+
+modelesImportButton.addEventListener('click', () => modelesImportFileInput.click());
+
+modelesImportFileInput.addEventListener('change', async () => {
+  const file = modelesImportFileInput.files[0];
+  modelesImportFileInput.value = '';
+  if (!file) return;
+  modeleError.textContent = '';
+  let imported;
+  try {
+    imported = JSON.parse(await file.text());
+    if (!Array.isArray(imported)) throw new Error('Le fichier ne contient pas un tableau JSON.');
+  } catch (error) {
+    modeleError.textContent = `Fichier illisible : ${error.message}`;
+    return;
+  }
+  if (!window.confirm(`Remplacer les ${modeles.length} modèle(s) actuel(s) par les ${imported.length} du fichier ?`)) return;
+  const previousModeles = modeles;
+  modeles = imported;
+  renderModeles();
+  renderEntryNewMenu();
+  try {
+    await saveModeles(modeles);
+  } catch (error) {
+    modeles = previousModeles;
+    renderModeles();
+    renderEntryNewMenu();
+    modeleError.textContent = `Échec de l'import : ${error.message}`;
+  }
+});
+
+dashboardsImportButton.addEventListener('click', () => dashboardsImportFileInput.click());
+
+dashboardsImportFileInput.addEventListener('change', async () => {
+  const file = dashboardsImportFileInput.files[0];
+  dashboardsImportFileInput.value = '';
+  if (!file) return;
+  sidebarDashboardsError.textContent = '';
+  let imported;
+  try {
+    imported = JSON.parse(await file.text());
+    if (!Array.isArray(imported)) throw new Error('Le fichier ne contient pas un tableau JSON.');
+  } catch (error) {
+    sidebarDashboardsError.textContent = `Fichier illisible : ${error.message}`;
+    return;
+  }
+  if (!window.confirm(`Remplacer les ${dashboards.length} tableau(x) de bord actuel(s) par les ${imported.length} du fichier ?`)) return;
+  const previousDashboards = dashboards;
+  dashboards = imported;
+  try {
+    await saveDashboards(dashboards);
+    if (!dashboards.some((d) => d.id === activeDashboardId)) {
+      activeDashboardId = dashboards[0]?.id ?? 'default';
+      setActiveDashboard(activeDashboardId);
+    }
+    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+    await loadAccountData();
+    renderMainView();
+  } catch (error) {
+    dashboards = previousDashboards;
+    sidebarDashboardsError.textContent = `Échec de l'import : ${error.message}`;
+  }
+});
+
 signInButton.addEventListener('click', signIn);
 signOutButton.addEventListener('click', signOut);
+
+// Bouton de contournement réservé au dev (voir dev-server.py, auth.js isLocalDevHost) :
+// jamais visible ailleurs qu'en localhost, jamais atteignable sur gh-pages.
+devLocalButton.hidden = !isLocalDevHost;
+devLocalButton.addEventListener('click', enableDevLocalMode);
 
 function closeEntryNewMenu() {
   entryNewMenu.hidden = true;
@@ -1435,6 +2479,45 @@ function renderTableLoading(tbody, colspan) {
   renderTableMessage(tbody, colspan, 'Chargement…');
 }
 
+// Charge le registre des dashboards puis toutes les données du dashboard actif.
+// Partagée entre la connexion Google initiale et une (re)connexion du dossier
+// Logbook (cf connectLogbookFolderFlow) : dans les deux cas, tout ce qui dépend
+// de getAppFolderId() (dashboards, entrées, modèles...) doit être rechargé depuis
+// le bon dossier.
+async function loadAccountAndDashboards() {
+  // Feedback immédiat : sans ça, sidebar et contenu restent figés/vides pendant les
+  // premiers appels Drive (chargement du registre de dashboards), avant même que
+  // loadAccountData démarre — ça donnait une impression de chargement incohérent.
+  renderMainView();
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+
+  try {
+    dashboards = await loadDashboards();
+  } catch (error) {
+    dashboards = [{ id: 'default', nom: 'Mon journal de bord', dossierNom: 'logbook', creeLe: new Date().toISOString() }];
+    // Le dossier connecté a pu être supprimé/déplacé entre-temps sur le Drive :
+    // getAppFolderId (drive.js) l'a alors détecté et déjà retiré du lien local
+    // (localStorage) — ne pas attendre un prochain rechargement de page pour
+    // reproposer la connexion, la rouvrir tout de suite.
+    if (error.message === LOGBOOK_FOLDER_NOT_CONNECTED) {
+      await openLogbookFolderModal();
+    } else {
+      sidebarDashboardsError.textContent = `Échec du chargement des tableaux de bord : ${error.message}`;
+    }
+  }
+  const storedDashboardId = localStorage.getItem(ACTIVE_DASHBOARD_KEY);
+  activeDashboardId = dashboards.some((d) => d.id === storedDashboardId) ? storedDashboardId : 'default';
+  setActiveDashboard(activeDashboardId);
+  // Dashboards connus tout de suite : la liste/bouton "créer" s'affichent sans attendre
+  // le reste (entrées/partages/modèles), qui arrive progressivement via loadAccountData.
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+
+  await loadAccountData();
+
+  renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
+  renderMainView();
+}
+
 // Charge entries/settings/partages/partagesRecus/modeles pour le dashboard actif
 // (déjà sélectionné via setActiveDashboard) et réaffiche les vues correspondantes.
 // Partagée entre la connexion initiale et la bascule de dashboard.
@@ -1582,7 +2665,7 @@ async function createDashboard() {
   if (!nom || !nom.trim()) return;
   sidebarDashboardsError.textContent = '';
   const id = crypto.randomUUID();
-  const dossierNom = `logbook-${id}`;
+  const dossierNom = expectedDossierNom({ id, nom: nom.trim() });
   const previousDashboards = dashboards;
   try {
     const dossierId = await createDashboardFolder(dossierNom);
@@ -1698,30 +2781,8 @@ onAuthChange(async (token) => {
   if (connected) {
     currentJournalId = getJournalIdFromUrl();
     mainView = 'entries';
-
-    // Feedback immédiat : sans ça, sidebar et contenu restent figés/vides pendant les
-    // premiers appels Drive (chargement du registre de dashboards), avant même que
-    // loadAccountData démarre — ça donnait une impression de chargement incohérent.
-    renderMainView();
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-
-    try {
-      dashboards = await loadDashboards();
-    } catch (error) {
-      dashboards = [{ id: 'default', nom: 'Mon journal de bord', dossierNom: 'logbook', creeLe: new Date().toISOString() }];
-      sidebarDashboardsError.textContent = `Échec du chargement des tableaux de bord : ${error.message}`;
-    }
-    const storedDashboardId = localStorage.getItem(ACTIVE_DASHBOARD_KEY);
-    activeDashboardId = dashboards.some((d) => d.id === storedDashboardId) ? storedDashboardId : 'default';
-    setActiveDashboard(activeDashboardId);
-    // Dashboards connus tout de suite : la liste/bouton "créer" s'affichent sans attendre
-    // le reste (entrées/partages/modèles), qui arrive progressivement via loadAccountData.
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-
-    await loadAccountData();
-
-    renderSidebar({ ownerName, partagesRecus, activeJournalId: currentJournalId, dashboards, activeDashboardId });
-    renderMainView();
+    if (!isLogbookFolderConnected()) await openLogbookFolderModal();
+    await loadAccountAndDashboards();
   } else {
     entries = [];
     settings = {};

@@ -16,6 +16,20 @@ export function resolveTitreModele(pattern, { date, id }) {
   return pattern.replace(/\{date\}/g, formatDateFr(date)).replace(/\{id\}/g, String(id));
 }
 
+const MOIS_FR = 'janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre';
+
+// Pour regrouper des titres générés en série (ex. "Rituel du soir — 21/11" et
+// "Rituel du soir — 25/09/2026") : les dates sous toutes leurs formes usuelles et
+// les nombres isolés sont remplacés par {date}/{id}, pour ne garder que la forme
+// commune du titre.
+export function titreGroupKey(titre) {
+  return (titre || '')
+    .replace(/\d{4}-\d{2}-\d{2}/g, '{date}')
+    .replace(/\d{1,2}\/\d{1,2}(\/\d{2,4})?/g, '{date}')
+    .replace(new RegExp(`\\d{1,2}\\s+(?:${MOIS_FR})\\s+\\d{4}`, 'gi'), '{date}')
+    .replace(/\d+/g, '{id}');
+}
+
 export function createTexteBlock(titre = 'Texte') {
   return { id: crypto.randomUUID(), type: 'texte', titre };
 }
@@ -37,26 +51,6 @@ export function createGraphiqueBlock(titre = 'Graphique') {
 export function formatDateFrCourt(dateIso) {
   return new Date(dateIso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
-
-const MESURES_RITUEL_NUMERIQUES = [
-  'Ressenti Masculin',
-  'Ressenti Féminin',
-  'Energie Journée',
-  'Energie Soir',
-  "Envie d'entamer une transition",
-  'Genre perçu (réel)',
-  'Confort (réel)',
-  'Stress (réel)',
-  'Ressenti (réel)',
-  'Comment elle me va - moi (réel)',
-  'Comment elle me va - IA (réel)',
-  'Genre perçu (féminisé)',
-  'Confort (féminisé)',
-  'Stress (féminisé)',
-  'Ressenti (féminisé)',
-  'Envie de ressembler à ça ? (féminisé)',
-  'Comment elle me va - IA (féminisé)',
-];
 
 // Construit le Contenu (tableau + graphique) d'un bilan à partir des entrées
 // « Rituel du soir » couvrant `jours` (liste de dates ISO). Les jours sont
@@ -99,9 +93,18 @@ function buildBilanRituel(entriesRituel, jours, titreTableau, titreGraphique) {
     });
   });
 
+  // Une ligne est tracée sur le graphique dès qu'elle a au moins une valeur numérique
+  // sur la période — pas de liste figée de noms de mesures, ça vaudrait pour n'importe
+  // quel modèle (pas seulement celui de l'utilisateur d'origine).
+  const estNumerique = (nom) =>
+    jours.some((jour) => {
+      const brut = valeurPour(nom, jour);
+      return brut !== '' && Number.isFinite(Number(brut));
+    });
+
   const graphiqueBlock = { id: crypto.randomUUID(), type: 'graphique', titre: titreGraphique };
   const series = lignesNoms
-    .filter((nom) => MESURES_RITUEL_NUMERIQUES.includes(nom))
+    .filter(estNumerique)
     .map((nom) => ({
       nom,
       points: jours.map((jour) => {
@@ -242,6 +245,24 @@ export function peutRemplirRessentiAFroid(entry, maintenant = new Date()) {
   const seuil = new Date(entry.date);
   seuil.setDate(seuil.getDate() + DELAI_RESSENTI_A_FROID_JOURS);
   return maintenant >= seuil;
+}
+
+// Valide la forme d'une entrée venue d'un fichier externe (import IA) avant de
+// l'ajouter au journal : un JSON mal formé écrit à la main sur le Drive ne doit
+// pas pouvoir casser l'affichage ou planter l'app silencieusement.
+export function validateImportedEntry(data) {
+  if (!data || typeof data !== 'object') return 'Le fichier ne contient pas un objet JSON.';
+  if (typeof data.id !== 'string' || !data.id) return 'Champ "id" manquant.';
+  if (typeof data.titre !== 'string') return 'Champ "titre" manquant.';
+  if (typeof data.date !== 'string' || !data.date) return 'Champ "date" manquant.';
+  if (!Array.isArray(data.themes) || !data.themes.every((t) => THEMES.includes(t))) return 'Champ "themes" invalide.';
+  if (!NIVEAUX_ACCES.includes(data.niveauAcces)) return 'Champ "niveauAcces" invalide.';
+  if (!STATUTS.includes(data.statut)) return 'Champ "statut" invalide.';
+  if (!data.contenuSchema || !Array.isArray(data.contenuSchema.blocks) || !Array.isArray(data.contenuSchema.order)) {
+    return 'Champ "contenuSchema" invalide.';
+  }
+  if (!data.contenuValeurs || typeof data.contenuValeurs !== 'object') return 'Champ "contenuValeurs" invalide.';
+  return null;
 }
 
 export function filtrerEntreesPartage(entries, regles) {

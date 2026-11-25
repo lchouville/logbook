@@ -1,0 +1,1135 @@
+[
+  {
+    "name": "rituel-01-complet.json",
+    "data": {
+      "id": "76e78121-00cd-479c-917a-08428176afe1",
+      "titre": "Rituel du soir — 16/12/2026",
+      "date": "2026-12-16",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-16T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "521d1d55-0054-4998-a9bc-300aad685d1c",
+            "type": "tableau",
+            "titre": "Mesures du soir",
+            "colonnes": [
+              {
+                "id": "eccd74be-2d65-42a3-8763-3a35e06bef31",
+                "nom": "Valeur"
+              }
+            ],
+            "lignes": [
+              {
+                "id": "d57f3dd1-2c81-4dd0-a6dc-40e709db4264",
+                "nom": "Ressenti Masculin"
+              },
+              {
+                "id": "6f982c89-c7d2-49b6-aee1-d6d20b18d902",
+                "nom": "Ressenti Féminin"
+              },
+              {
+                "id": "ce72199d-35d6-4b52-897c-73c084fd1469",
+                "nom": "Energie Journée"
+              },
+              {
+                "id": "133910a5-17f9-4550-a50c-a89c465c520e",
+                "nom": "Energie Soir"
+              },
+              {
+                "id": "43a8b1a4-1d0f-4f43-b2bb-0446fe4be265",
+                "nom": "Envie d'entamer une transition"
+              },
+              {
+                "id": "43244e74-ef3a-4cc5-b3d3-dbd7d73fc842",
+                "nom": "Type de Journée"
+              }
+            ]
+          }
+        ],
+        "order": [
+          "521d1d55-0054-4998-a9bc-300aad685d1c"
+        ]
+      },
+      "contenuValeurs": {
+        "521d1d55-0054-4998-a9bc-300aad685d1c": {
+          "d57f3dd1-2c81-4dd0-a6dc-40e709db4264": {
+            "eccd74be-2d65-42a3-8763-3a35e06bef31": "4"
+          },
+          "6f982c89-c7d2-49b6-aee1-d6d20b18d902": {
+            "eccd74be-2d65-42a3-8763-3a35e06bef31": "7"
+          },
+          "ce72199d-35d6-4b52-897c-73c084fd1469": {
+            "eccd74be-2d65-42a3-8763-3a35e06bef31": "6"
+          },
+          "133910a5-17f9-4550-a50c-a89c465c520e": {
+            "eccd74be-2d65-42a3-8763-3a35e06bef31": "5"
+          },
+          "43a8b1a4-1d0f-4f43-b2bb-0446fe4be265": {
+            "eccd74be-2d65-42a3-8763-3a35e06bef31": "8"
+          },
+          "43244e74-ef3a-4cc5-b3d3-dbd7d73fc842": {
+            "eccd74be-2d65-42a3-8763-3a35e06bef31": "1"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "rituel-02-sans-type-journee.json",
+    "data": {
+      "id": "53e874f2-f4d1-4f4c-ada6-2376af3d37be",
+      "titre": "Rituel du soir — 17/12/2026",
+      "date": "2026-12-17",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-17T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "21168b45-2a5d-438b-b9b1-5d836d885128",
+            "type": "tableau",
+            "titre": "Mesures du soir",
+            "colonnes": [
+              {
+                "id": "5adda2ff-221c-40ad-9479-f52d1af35a2b",
+                "nom": "Valeur"
+              }
+            ],
+            "lignes": [
+              {
+                "id": "320e677f-568b-4c21-a2e9-e337014ec56a",
+                "nom": "Ressenti Masculin"
+              },
+              {
+                "id": "bc096026-9cbc-4065-b430-7502060d2e9d",
+                "nom": "Ressenti Féminin"
+              },
+              {
+                "id": "e79551a5-20fe-4db7-8ceb-6303ccb0af0a",
+                "nom": "Energie Journée"
+              },
+              {
+                "id": "dba98dd2-578e-426a-9c5f-74b301492631",
+                "nom": "Energie Soir"
+              },
+              {
+                "id": "56f3e1ef-d3fe-4d01-ab52-e02b82803b90",
+                "nom": "Envie d'entamer une transition"
+              }
+            ]
+          }
+        ],
+        "order": [
+          "21168b45-2a5d-438b-b9b1-5d836d885128"
+        ]
+      },
+      "contenuValeurs": {
+        "21168b45-2a5d-438b-b9b1-5d836d885128": {
+          "320e677f-568b-4c21-a2e9-e337014ec56a": {
+            "5adda2ff-221c-40ad-9479-f52d1af35a2b": "5"
+          },
+          "bc096026-9cbc-4065-b430-7502060d2e9d": {
+            "5adda2ff-221c-40ad-9479-f52d1af35a2b": "8"
+          },
+          "e79551a5-20fe-4db7-8ceb-6303ccb0af0a": {
+            "5adda2ff-221c-40ad-9479-f52d1af35a2b": "7"
+          },
+          "dba98dd2-578e-426a-9c5f-74b301492631": {
+            "5adda2ff-221c-40ad-9479-f52d1af35a2b": "4"
+          },
+          "56f3e1ef-d3fe-4d01-ab52-e02b82803b90": {
+            "5adda2ff-221c-40ad-9479-f52d1af35a2b": "9"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "rituel-03-ligne-en-plus.json",
+    "data": {
+      "id": "03d6e30e-48d7-4975-9fc1-20a04043b0c9",
+      "titre": "Rituel du soir — 18/12/2026",
+      "date": "2026-12-18",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-18T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "b0e283d1-eaf0-4abb-955a-49facd08eb29",
+            "type": "tableau",
+            "titre": "Mesures du soir",
+            "colonnes": [
+              {
+                "id": "7b22da1e-5b6a-485b-b5c1-7abf2c0aca8b",
+                "nom": "Valeur"
+              }
+            ],
+            "lignes": [
+              {
+                "id": "8d942974-1327-4e3b-bd87-9cbb782e7bb7",
+                "nom": "Ressenti Masculin"
+              },
+              {
+                "id": "7c93901f-0c39-44d8-a04b-c2402a19889b",
+                "nom": "Ressenti Féminin"
+              },
+              {
+                "id": "bf82bf32-5949-4275-9f6a-1cffe9c33950",
+                "nom": "Energie Journée"
+              },
+              {
+                "id": "23f89033-4925-4d28-80a8-701551de2935",
+                "nom": "Energie Soir"
+              },
+              {
+                "id": "23259f34-3645-48c9-918e-961dd866483c",
+                "nom": "Envie d'entamer une transition"
+              },
+              {
+                "id": "4283d9ed-e9fb-4a48-bab2-75274195cc41",
+                "nom": "Décalage avec mon corps"
+              }
+            ]
+          }
+        ],
+        "order": [
+          "b0e283d1-eaf0-4abb-955a-49facd08eb29"
+        ]
+      },
+      "contenuValeurs": {
+        "b0e283d1-eaf0-4abb-955a-49facd08eb29": {
+          "8d942974-1327-4e3b-bd87-9cbb782e7bb7": {
+            "7b22da1e-5b6a-485b-b5c1-7abf2c0aca8b": "3"
+          },
+          "7c93901f-0c39-44d8-a04b-c2402a19889b": {
+            "7b22da1e-5b6a-485b-b5c1-7abf2c0aca8b": "6"
+          },
+          "bf82bf32-5949-4275-9f6a-1cffe9c33950": {
+            "7b22da1e-5b6a-485b-b5c1-7abf2c0aca8b": "5"
+          },
+          "23f89033-4925-4d28-80a8-701551de2935": {
+            "7b22da1e-5b6a-485b-b5c1-7abf2c0aca8b": "6"
+          },
+          "23259f34-3645-48c9-918e-961dd866483c": {
+            "7b22da1e-5b6a-485b-b5c1-7abf2c0aca8b": "7"
+          },
+          "4283d9ed-e9fb-4a48-bab2-75274195cc41": {
+            "7b22da1e-5b6a-485b-b5c1-7abf2c0aca8b": "5"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "rituel-04-ligne-peur.json",
+    "data": {
+      "id": "94aa27f2-be3a-4d9f-bc48-8bd5f29f4cd0",
+      "titre": "Rituel du soir — 19/12/2026",
+      "date": "2026-12-19",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-19T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "5f7b08e8-99f8-4a9e-ad15-3a81702d8802",
+            "type": "tableau",
+            "titre": "Mesures du soir",
+            "colonnes": [
+              {
+                "id": "2e27047e-4444-4fc2-a66d-8e62b535cc5b",
+                "nom": "Valeur"
+              }
+            ],
+            "lignes": [
+              {
+                "id": "e573387d-0c78-4235-8a8b-5732b042df6b",
+                "nom": "Ressenti Masculin"
+              },
+              {
+                "id": "d9ef1595-5908-4e58-a516-9c8c5590301a",
+                "nom": "Ressenti Féminin"
+              },
+              {
+                "id": "e47dfbca-d2a2-402c-8c3f-189eaceb5eff",
+                "nom": "Energie Journée"
+              },
+              {
+                "id": "92b75f81-0023-436c-b301-266b21cfff24",
+                "nom": "Energie Soir"
+              },
+              {
+                "id": "f2c17825-43fd-4430-af7c-bdd94689a955",
+                "nom": "Envie d'entamer une transition"
+              },
+              {
+                "id": "b124a657-8eec-4278-bebf-e099432749cc",
+                "nom": "Peur"
+              }
+            ]
+          }
+        ],
+        "order": [
+          "5f7b08e8-99f8-4a9e-ad15-3a81702d8802"
+        ]
+      },
+      "contenuValeurs": {
+        "5f7b08e8-99f8-4a9e-ad15-3a81702d8802": {
+          "e573387d-0c78-4235-8a8b-5732b042df6b": {
+            "2e27047e-4444-4fc2-a66d-8e62b535cc5b": "4"
+          },
+          "d9ef1595-5908-4e58-a516-9c8c5590301a": {
+            "2e27047e-4444-4fc2-a66d-8e62b535cc5b": "7"
+          },
+          "e47dfbca-d2a2-402c-8c3f-189eaceb5eff": {
+            "2e27047e-4444-4fc2-a66d-8e62b535cc5b": "6"
+          },
+          "92b75f81-0023-436c-b301-266b21cfff24": {
+            "2e27047e-4444-4fc2-a66d-8e62b535cc5b": "6"
+          },
+          "f2c17825-43fd-4430-af7c-bdd94689a955": {
+            "2e27047e-4444-4fc2-a66d-8e62b535cc5b": "8"
+          },
+          "b124a657-8eec-4278-bebf-e099432749cc": {
+            "2e27047e-4444-4fc2-a66d-8e62b535cc5b": "2"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "rituel-05-structure-identique-modele.json",
+    "data": {
+      "id": "5c698f64-cc43-4d61-b815-a22a74dc93e8",
+      "titre": "Rituel du soir — 20/12/2026",
+      "date": "2026-12-20",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-20T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "6080056f-debc-40a4-ace1-3ce74bb54706",
+            "type": "tableau",
+            "titre": "Mesures du soir",
+            "colonnes": [
+              {
+                "id": "75e21012-d79b-46c6-a0f5-51dda9c95777",
+                "nom": "Valeur"
+              },
+              {
+                "id": "e10e634d-1c2a-4740-bc6a-aee984e615ce",
+                "nom": "Commentaire"
+              }
+            ],
+            "lignes": [
+              {
+                "id": "c0779821-9027-4c79-95b4-4b8022023b63",
+                "nom": "Ressenti Masculin"
+              },
+              {
+                "id": "3eac3bf3-3f11-401c-afd4-089b2b3865aa",
+                "nom": "Ressenti Féminin"
+              },
+              {
+                "id": "6eef08da-e3d6-4a4b-a04b-2b165cbbfdac",
+                "nom": "Energie Journée"
+              },
+              {
+                "id": "95aea0ef-f5cb-451c-af5d-aada7743645d",
+                "nom": "Energie Soir"
+              },
+              {
+                "id": "1ddaf833-48b0-4b49-93a4-a74f92e9a4ff",
+                "nom": "Envie d'entamer une transition"
+              },
+              {
+                "id": "7b41fc05-8104-4db6-8c06-feb45b8656f5",
+                "nom": "Type de Journée"
+              }
+            ]
+          }
+        ],
+        "order": [
+          "6080056f-debc-40a4-ace1-3ce74bb54706"
+        ]
+      },
+      "contenuValeurs": {
+        "6080056f-debc-40a4-ace1-3ce74bb54706": {
+          "c0779821-9027-4c79-95b4-4b8022023b63": {
+            "75e21012-d79b-46c6-a0f5-51dda9c95777": "4",
+            "e10e634d-1c2a-4740-bc6a-aee984e615ce": ""
+          },
+          "3eac3bf3-3f11-401c-afd4-089b2b3865aa": {
+            "75e21012-d79b-46c6-a0f5-51dda9c95777": "7",
+            "e10e634d-1c2a-4740-bc6a-aee984e615ce": ""
+          },
+          "6eef08da-e3d6-4a4b-a04b-2b165cbbfdac": {
+            "75e21012-d79b-46c6-a0f5-51dda9c95777": "6",
+            "e10e634d-1c2a-4740-bc6a-aee984e615ce": ""
+          },
+          "95aea0ef-f5cb-451c-af5d-aada7743645d": {
+            "75e21012-d79b-46c6-a0f5-51dda9c95777": "5",
+            "e10e634d-1c2a-4740-bc6a-aee984e615ce": ""
+          },
+          "1ddaf833-48b0-4b49-93a4-a74f92e9a4ff": {
+            "75e21012-d79b-46c6-a0f5-51dda9c95777": "8",
+            "e10e634d-1c2a-4740-bc6a-aee984e615ce": ""
+          },
+          "7b41fc05-8104-4db6-8c06-feb45b8656f5": {
+            "75e21012-d79b-46c6-a0f5-51dda9c95777": "1",
+            "e10e634d-1c2a-4740-bc6a-aee984e615ce": ""
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "rituel-06-modele-deja-lie.json",
+    "data": {
+      "id": "a95065aa-87f6-415b-b732-184bc3ae8fb4",
+      "titre": "Rituel du soir — 21/12/2026",
+      "date": "2026-12-21",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": "5b362f05-992d-47ed-87ac-6a183981ba5c",
+      "creeLe": "2026-12-21T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "43a62532-2200-4cb8-b52c-46907c3f2d79",
+            "type": "tableau",
+            "titre": "Mesures du soir",
+            "colonnes": [
+              {
+                "id": "f0fb7e83-cd0d-4e05-92d3-624e68672a2f",
+                "nom": "Valeur"
+              },
+              {
+                "id": "09cc181c-b593-49ae-9347-c55b32ebd5e8",
+                "nom": "Commentaire"
+              }
+            ],
+            "lignes": [
+              {
+                "id": "3d9da523-476c-410c-9725-a3735a1262c6",
+                "nom": "Ressenti Masculin"
+              },
+              {
+                "id": "7e120780-966d-4c24-900d-03fee12946fd",
+                "nom": "Ressenti Féminin"
+              },
+              {
+                "id": "baf63623-8cc7-4d85-b574-9e3083b5e568",
+                "nom": "Energie Journée"
+              },
+              {
+                "id": "454da591-e893-447e-a5a5-43a1e70c70f7",
+                "nom": "Energie Soir"
+              },
+              {
+                "id": "27fe50c4-b33e-44cc-b236-2afe2f1e8060",
+                "nom": "Envie d'entamer une transition"
+              },
+              {
+                "id": "9f497c1a-4ade-44ec-97e3-5c3a7837b810",
+                "nom": "Type de Journée"
+              }
+            ]
+          }
+        ],
+        "order": [
+          "43a62532-2200-4cb8-b52c-46907c3f2d79"
+        ]
+      },
+      "contenuValeurs": {
+        "43a62532-2200-4cb8-b52c-46907c3f2d79": {
+          "3d9da523-476c-410c-9725-a3735a1262c6": {
+            "f0fb7e83-cd0d-4e05-92d3-624e68672a2f": "4",
+            "09cc181c-b593-49ae-9347-c55b32ebd5e8": ""
+          },
+          "7e120780-966d-4c24-900d-03fee12946fd": {
+            "f0fb7e83-cd0d-4e05-92d3-624e68672a2f": "7",
+            "09cc181c-b593-49ae-9347-c55b32ebd5e8": ""
+          },
+          "baf63623-8cc7-4d85-b574-9e3083b5e568": {
+            "f0fb7e83-cd0d-4e05-92d3-624e68672a2f": "6",
+            "09cc181c-b593-49ae-9347-c55b32ebd5e8": ""
+          },
+          "454da591-e893-447e-a5a5-43a1e70c70f7": {
+            "f0fb7e83-cd0d-4e05-92d3-624e68672a2f": "5",
+            "09cc181c-b593-49ae-9347-c55b32ebd5e8": ""
+          },
+          "27fe50c4-b33e-44cc-b236-2afe2f1e8060": {
+            "f0fb7e83-cd0d-4e05-92d3-624e68672a2f": "8",
+            "09cc181c-b593-49ae-9347-c55b32ebd5e8": ""
+          },
+          "9f497c1a-4ade-44ec-97e3-5c3a7837b810": {
+            "f0fb7e83-cd0d-4e05-92d3-624e68672a2f": "1",
+            "09cc181c-b593-49ae-9347-c55b32ebd5e8": ""
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "bilan-01.json",
+    "data": {
+      "id": "984c6b37-2101-4a47-866f-b6f782d48075",
+      "titre": "Bilan du rituel du soir du 2026-11-16",
+      "date": "2026-11-16",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N3",
+      "statut": "Bilan",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-11-16T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "4d406745-927e-4109-bc2c-d60badfad042",
+            "type": "tableau",
+            "titre": "Tableau de la semaine",
+            "colonnes": [],
+            "lignes": []
+          },
+          {
+            "id": "e7709818-c269-4cfe-8fde-d4a044525853",
+            "type": "graphique",
+            "titre": "Évolution sur la semaine"
+          }
+        ],
+        "order": [
+          "4d406745-927e-4109-bc2c-d60badfad042",
+          "e7709818-c269-4cfe-8fde-d4a044525853"
+        ]
+      },
+      "contenuValeurs": {
+        "4d406745-927e-4109-bc2c-d60badfad042": {},
+        "e7709818-c269-4cfe-8fde-d4a044525853": {
+          "series": []
+        }
+      }
+    }
+  },
+  {
+    "name": "bilan-02.json",
+    "data": {
+      "id": "8f5ee244-fe4a-4e0f-b630-3eed2a8891e6",
+      "titre": "Bilan du rituel du soir du 2026-11-23",
+      "date": "2026-11-23",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N3",
+      "statut": "Bilan",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-11-23T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "873e2c4d-4265-44ca-b583-96a067d8920d",
+            "type": "tableau",
+            "titre": "Tableau de la semaine",
+            "colonnes": [],
+            "lignes": []
+          },
+          {
+            "id": "286e9357-db0a-4a83-a0bc-ebbfdf3b4c28",
+            "type": "graphique",
+            "titre": "Évolution sur la semaine"
+          }
+        ],
+        "order": [
+          "873e2c4d-4265-44ca-b583-96a067d8920d",
+          "286e9357-db0a-4a83-a0bc-ebbfdf3b4c28"
+        ]
+      },
+      "contenuValeurs": {
+        "873e2c4d-4265-44ca-b583-96a067d8920d": {},
+        "286e9357-db0a-4a83-a0bc-ebbfdf3b4c28": {
+          "series": []
+        }
+      }
+    }
+  },
+  {
+    "name": "test-import-01.json",
+    "data": {
+      "id": "1bfcd538-5d8d-4747-97d2-429d1947329c",
+      "titre": "Test import — 1",
+      "date": "2026-12-22",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-22T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "43bcecc0-800e-4bb1-8f63-8782437ff848",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "43bcecc0-800e-4bb1-8f63-8782437ff848"
+        ]
+      },
+      "contenuValeurs": {
+        "43bcecc0-800e-4bb1-8f63-8782437ff848": "Fiche de test (1/3)."
+      }
+    }
+  },
+  {
+    "name": "test-import-02.json",
+    "data": {
+      "id": "ae3f1120-fab5-4929-92ad-824192ba4c3e",
+      "titre": "Test import — 2",
+      "date": "2026-12-23",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-23T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "610d7acc-7014-4c8a-9570-41bf538d58a3",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "610d7acc-7014-4c8a-9570-41bf538d58a3"
+        ]
+      },
+      "contenuValeurs": {
+        "610d7acc-7014-4c8a-9570-41bf538d58a3": "Fiche de test (2/3)."
+      }
+    }
+  },
+  {
+    "name": "test-import-03.json",
+    "data": {
+      "id": "66f96eb0-efc0-409c-b580-974d7a45a464",
+      "titre": "Test import — 3",
+      "date": "2026-12-24",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-24T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "b9e69eb1-a31d-4139-a89a-01d2d5485802",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "b9e69eb1-a31d-4139-a89a-01d2d5485802"
+        ]
+      },
+      "contenuValeurs": {
+        "b9e69eb1-a31d-4139-a89a-01d2d5485802": "Fiche de test (3/3)."
+      }
+    }
+  },
+  {
+    "name": "singleton-01-notes-voyage.json",
+    "data": {
+      "id": "6e2d472a-f01f-4b25-8aab-8f6c3f2ba454",
+      "titre": "Notes de voyage",
+      "date": "2026-12-25",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-25T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "323519b6-75ce-47b8-9c9c-0d8c293117fe",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "323519b6-75ce-47b8-9c9c-0d8c293117fe"
+        ]
+      },
+      "contenuValeurs": {
+        "323519b6-75ce-47b8-9c9c-0d8c293117fe": "Texte libre sans pattern commun."
+      }
+    }
+  },
+  {
+    "name": "singleton-02-reflexion-matin.json",
+    "data": {
+      "id": "3c3fffd1-9609-4597-b0bb-112b1a1d2973",
+      "titre": "Réflexion du matin",
+      "date": "2026-12-26",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-26T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "701cb14c-637a-4abf-a794-ddd42f9729c1",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "701cb14c-637a-4abf-a794-ddd42f9729c1"
+        ]
+      },
+      "contenuValeurs": {
+        "701cb14c-637a-4abf-a794-ddd42f9729c1": "Autre texte libre."
+      }
+    }
+  },
+  {
+    "name": "singleton-03-journal-libre.json",
+    "data": {
+      "id": "b5a271dd-2a6f-4884-84b1-3ba5f974c638",
+      "titre": "Journal libre — 27/12",
+      "date": "2026-12-27",
+      "themes": [
+        "Moral",
+        "Travail"
+      ],
+      "niveauAcces": "N5",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-27T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "8070e05a-59ea-444e-ba30-2f484cc1c394",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "8070e05a-59ea-444e-ba30-2f484cc1c394"
+        ]
+      },
+      "contenuValeurs": {
+        "8070e05a-59ea-444e-ba30-2f484cc1c394": "Entrée avec plusieurs thèmes et niveau N5."
+      }
+    }
+  },
+  {
+    "name": "erreur-01-niveau-invalide.json",
+    "data": {
+      "id": "b92db1f1-8f32-4c1d-bc62-ed7e4695bac3",
+      "titre": "Erreur niveauAcces",
+      "date": "2026-12-28",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N9",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-28T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "a036ad07-c8c0-4cb4-a698-d516e748cc3e",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "a036ad07-c8c0-4cb4-a698-d516e748cc3e"
+        ]
+      },
+      "contenuValeurs": {
+        "a036ad07-c8c0-4cb4-a698-d516e748cc3e": "x"
+      }
+    }
+  },
+  {
+    "name": "erreur-02-statut-invalide.json",
+    "data": {
+      "id": "c3a01861-8bb4-498a-82f3-b771712baf6f",
+      "titre": "Erreur statut",
+      "date": "2026-12-29",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Inconnu",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-29T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "156ed28a-b371-4ac0-9839-1ad1304713b8",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "156ed28a-b371-4ac0-9839-1ad1304713b8"
+        ]
+      },
+      "contenuValeurs": {
+        "156ed28a-b371-4ac0-9839-1ad1304713b8": "x"
+      }
+    }
+  },
+  {
+    "name": "erreur-03-titre-manquant.json",
+    "data": {
+      "id": "24e25d37-4784-4405-a9c4-6f895a25e21e",
+      "date": "2026-12-30",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-30T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "4ae11cf4-34d9-4d71-8970-60478f00489e",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "4ae11cf4-34d9-4d71-8970-60478f00489e"
+        ]
+      },
+      "contenuValeurs": {
+        "4ae11cf4-34d9-4d71-8970-60478f00489e": "x"
+      }
+    }
+  },
+  {
+    "name": "erreur-04-contenu-schema-invalide.json",
+    "data": {
+      "id": "bd3ea10c-8a6d-44dd-a875-c6f50c2adbc5",
+      "titre": "Erreur contenuSchema",
+      "date": "2026-12-31",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2026-12-31T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": "pas-un-tableau",
+        "order": []
+      },
+      "contenuValeurs": {
+        "4fcd5683-56ec-47ee-8368-636fb4958e1f": "x"
+      }
+    }
+  },
+  {
+    "name": "erreur-05-theme-invalide.json",
+    "data": {
+      "id": "b57a4a43-1542-4a33-9861-696639b08ba3",
+      "titre": "Erreur thème",
+      "date": "2027-01-01",
+      "themes": [
+        "Carrière"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2027-01-01T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "7187302c-c2df-4cb9-929d-c24cf408ec9d",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "7187302c-c2df-4cb9-929d-c24cf408ec9d"
+        ]
+      },
+      "contenuValeurs": {
+        "7187302c-c2df-4cb9-929d-c24cf408ec9d": "x"
+      }
+    }
+  },
+  {
+    "name": "erreur-06-id-duplique.json",
+    "data": {
+      "id": "94a0c7b1-a274-4cb6-8a0b-948cff8894c3",
+      "titre": "Erreur id déjà existant",
+      "date": "2027-01-02",
+      "themes": [
+        "Identité de genre"
+      ],
+      "niveauAcces": "N2",
+      "statut": "Complete",
+      "ressentiAFroid": null,
+      "champsPersonnalises": {},
+      "champsSchema": {
+        "fields": [],
+        "order": [
+          "themes",
+          "niveau",
+          "statut"
+        ]
+      },
+      "modeleId": null,
+      "creeLe": "2027-01-02T20:00:00.000Z",
+      "contenuSchema": {
+        "blocks": [
+          {
+            "id": "dd4c5ae3-4957-49ac-872d-91ef239ee486",
+            "type": "texte",
+            "titre": "Texte"
+          }
+        ],
+        "order": [
+          "dd4c5ae3-4957-49ac-872d-91ef239ee486"
+        ]
+      },
+      "contenuValeurs": {
+        "dd4c5ae3-4957-49ac-872d-91ef239ee486": "x"
+      }
+    }
+  }
+]

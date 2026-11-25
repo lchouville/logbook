@@ -4,6 +4,7 @@ Thumbs.db
 .vscode/
 .idea/
 js/config.js
+.devdrive/
 
 # >>> myclaude-sync: shared agents/rules/skills, never commit (auto-generated) >>>
 .claude/agents/

@@ -3,10 +3,21 @@ const modalBackdrop = document.getElementById('modal-backdrop');
 const modalPanel = document.getElementById('modal-panel');
 const modalClose = document.getElementById('modal-close');
 
-const SECTION_IDS = ['entry-form-modal', 'modele-form-modal'];
+const SECTION_IDS = [
+  'logbook-folder-modal',
+  'entry-form-modal',
+  'modele-form-modal',
+  'integration-progress-modal',
+  'mapping-correction-modal',
+  'inspection-fiche-modal',
+];
 const WIDE_SECTION_IDS = ['entry-form-modal', 'modele-form-modal'];
 const closeListeners = [];
 let returnFocusEl = null;
+// À false pendant un traitement en cours (ex. intégration groupée) : empêche de
+// fermer la popup par la croix/le fond/Échap, pour ne pas laisser l'utilisateur
+// croire qu'il peut modifier les mêmes données pendant que le traitement tourne.
+let dismissable = true;
 
 function getFocusable() {
   return Array.from(
@@ -25,23 +36,25 @@ export function closeModal() {
   returnFocusEl = null;
 }
 
-export function openModal(sectionId) {
+export function openModal(sectionId, { dismissable: canDismiss = true } = {}) {
   for (const id of SECTION_IDS) {
     document.getElementById(id).hidden = id !== sectionId;
   }
   modalPanel.classList.toggle('modal-panel--wide', WIDE_SECTION_IDS.includes(sectionId));
+  dismissable = canDismiss;
+  modalClose.hidden = !canDismiss;
   returnFocusEl = document.activeElement;
   modalRoot.hidden = false;
   const focusable = getFocusable().filter((el) => el !== modalClose);
   (focusable[0] ?? modalClose).focus();
 }
 
-modalBackdrop.addEventListener('click', closeModal);
-modalClose.addEventListener('click', closeModal);
+modalBackdrop.addEventListener('click', () => dismissable && closeModal());
+modalClose.addEventListener('click', () => dismissable && closeModal());
 document.addEventListener('keydown', (event) => {
   if (modalRoot.hidden) return;
   if (event.key === 'Escape') {
-    closeModal();
+    if (dismissable) closeModal();
     return;
   }
   if (event.key !== 'Tab') return;
