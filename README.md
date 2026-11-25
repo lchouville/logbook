@@ -14,13 +14,13 @@ HTML / CSS / JavaScript natifs, sans framework ni étape de build. Objectif : re
 
 ## Branches
 
-- `develop` — branche de travail, par défaut.
-- `release` — version stabilisée, prête à publier (point de passage avant `gh-page`).
-- `gh-page` — branche servie par GitHub Pages (site public à l'URL `https://lchouville.github.io/logbook/`).
+- `main` — production, toujours stable et déployable. Chaque tag `vX.Y.Z` posé dessus déclenche une release.
+- `develop` — intégration, branche de travail par défaut.
+- `release` — branche orpheline alimentée uniquement par la CI : ne contient que le build compilé de chaque version (`vX.Y.Z/` + `latest/`), jamais de code source ni de commit manuel.
 
-Flux : `develop` → `release` → `gh-page`.
+`main` et `develop` sont protégées : push direct interdit, passage obligatoire par une Pull Request. Une CI légère (GitHub Actions, voir `.github/workflows/ci.yml`) valide le HTML sur chaque PR vers ces branches ; la PR ne peut être mergée que si ce contrôle passe.
 
-`develop`, `release` et `gh-page` sont protégées : push direct interdit, passage obligatoire par une Pull Request. Une CI légère (GitHub Actions, voir `.github/workflows/ci.yml`) valide le HTML sur chaque PR vers ces branches ; la PR ne peut être mergée que si ce contrôle passe.
+Le site public (`https://lchouville.github.io/logbook/`) est déployé automatiquement depuis `main` via GitHub Actions (`.github/workflows/deploy.yml`), sans branche `gh-pages` dédiée.
 
 ## Workflow de contribution
 
@@ -28,11 +28,16 @@ Tout ajout ou correctif passe par une branche dédiée, jamais par un commit dir
 
 - `feature/<nom>` — nouvelle fonctionnalité. Part de `develop`, PR vers `develop`.
 - `fix/<correctif>` — correction non urgente. Part de `develop`, PR vers `develop`.
-- `hotfix/<correctif>` — correction urgente sur une version déjà publiée. Part de `release`, PR vers `release`, puis `release` est mergée vers `gh-page` et reportée (merge ou cherry-pick) sur `develop` pour ne pas perdre le correctif.
+- `hotfix/<correctif>` — correction urgente. Part de `develop`, PR vers `develop`, à livrer en priorité.
+- `prepare-release/<version>` — préparation d'une version depuis `develop`, PR vers `main` (tag `vX.Y.Z`) puis vers `develop`.
+- `hotfix-release/<version>` — report de hotfix déjà fusionnés sur `develop` vers `main`, depuis une branche créée à partir de `main`.
 
 ## Notes de version
 
-Un brouillon de release GitHub est tenu à jour automatiquement (`.github/workflows/release-drafter.yml`, config `.github/release-drafter.yml`) à chaque push sur `develop` ou `gh-page` : les PR fusionnées sont classées par type de commit (`feat`, `fix`, `docs`...) et la version suivante (`vX.Y.Z`) est proposée. L'utilisateur relit, corrige et publie ce brouillon pour déclencher la release. À la publication, `.github/workflows/release-notes-merge.yml` ajoute automatiquement les notes à la fin de `release-notes.md` via une PR vers `develop` (idempotent, ne touche jamais aux versions déjà présentes).
+Un brouillon de release GitHub est tenu à jour automatiquement (`.github/workflows/release-drafter.yml`, config `.github/release-drafter.yml`) à chaque push sur `develop` ou `main` : les PR fusionnées sont classées par type de commit (`feat`, `fix`, `docs`...) et la version suivante (`vX.Y.Z`) est proposée. L'utilisateur relit, corrige et publie ce brouillon sur `main` pour déclencher la release. À la publication :
+- `.github/workflows/release-notes-merge.yml` ajoute automatiquement les notes à la fin de `release-notes.md` via une PR vers `develop` (idempotent, ne touche jamais aux versions déjà présentes) ;
+- `.github/workflows/release-build.yml` publie le build compilé de cette version sur la branche `release` (`vX.Y.Z/` et `latest/`) ;
+- `.github/workflows/deploy.yml` (déclenché par le push du tag sur `main`) régénère `portfolio.json` et republie le site.
 
 ## Configuration Google OAuth
 
@@ -45,7 +50,7 @@ Pour le partage (voir plus bas), l'API Picker doit aussi être activée dans ce 
 `js/config.js` n'est **pas commité** (`.gitignore`) : même si le Client ID et la clé Picker sont des identifiants publics par conception (visibles côté client, protégés par les restrictions référent/API côté Google Cloud plutôt que par le secret), les garder hors de l'historique Git évite qu'ils traînent dans chaque PR/commit d'une branche de travail. `js/config.template.js` est le fichier commité, avec des placeholders `__GOOGLE_CLIENT_ID__` / `__GOOGLE_PICKER_API_KEY__`.
 
 - **En local** : copier `js/config.template.js` vers `js/config.js` et renseigner les vraies valeurs à la main.
-- **En publication** : `.github/workflows/deploy.yml` se déclenche sur chaque push vers `gh-page`, génère `js/config.js` à partir du template et des secrets du dépôt (`GOOGLE_CLIENT_ID`, `GOOGLE_PICKER_API_KEY` — Settings → Secrets and variables → Actions), puis déploie directement sur GitHub Pages (`actions/upload-pages-artifact` + `actions/deploy-pages`) sans jamais commiter le fichier généré.
+- **En publication** : `.github/workflows/deploy.yml` se déclenche sur chaque push vers `main`, génère `js/config.js` à partir du template et des secrets du dépôt (`GOOGLE_CLIENT_ID`, `GOOGLE_PICKER_API_KEY` — Settings → Secrets and variables → Actions), génère `portfolio.json`, puis déploie directement sur GitHub Pages (`actions/upload-pages-artifact` + `actions/deploy-pages`) sans jamais commiter les fichiers générés.
 - **Prérequis unique côté réglages GitHub** (à faire une fois, manuellement) : dans Settings → Pages, mettre la source sur **GitHub Actions** (plutôt que "Deploy from a branch"), sinon ce workflow ne publie rien.
 
 ## Stockage Drive
@@ -127,7 +132,7 @@ Le flux OAuth implicite de Google (`initTokenClient`, utilisé ici) ne délivre 
 
 - [x] Créer un client OAuth Google (Google Cloud Console) et renseigner son ID dans `js/config.js`.
 - [x] Implémenter la connexion Google (Google Identity Services).
-- [x] Activer GitHub Pages sur la branche `gh-page`.
+- [x] Activer GitHub Pages, déployé via GitHub Actions depuis `main`.
 - [x] Implémenter la lecture/écriture des entrées dans le Google Drive de l'utilisateur (scope minimal `drive.file`).
 - [x] Modéliser une entrée : thème, niveau d'accès (N1-N5), statut, ressenti à froid.
 - [x] UI pour remplir le ressenti à froid d'une entrée existante (après 2 jours).

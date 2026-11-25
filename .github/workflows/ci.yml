@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [develop, release, gh-page]
+    branches: [develop, main]
 
 permissions:
   contents: read
@@ -18,13 +18,13 @@ jobs:
         run: html5validator --root . --match '*.html'
 
   no-tracking-files:
-    if: github.base_ref == 'gh-page'
+    if: github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Refuse visual-ref/ and REPRISE.md on gh-page
+      - name: Refuse visual-ref/ et REPRISE.md sur main
         run: |
           if [ -d visual-ref ] || [ -f REPRISE.md ]; then
-            echo "visual-ref/ et REPRISE.md sont des fichiers de suivi internes, jamais publiés sur gh-page." >&2
+            echo "visual-ref/ et REPRISE.md sont des fichiers de suivi internes, jamais publiés sur main." >&2
             exit 1
           fi
