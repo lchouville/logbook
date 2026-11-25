@@ -56,3 +56,9 @@
 
 - docs(git): clarify branch workflow for sequential unrelated tasks (#61)
 
+
+## v0.1.1 - 2026-11-25
+
+### 🐛 Corrections
+
+- fix(ci): régénère portfolio.json aussi à la publication d'une release (#72)
