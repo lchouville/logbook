@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [gh-page]
+    branches: [main]
 
 permissions:
   contents: read
@@ -30,6 +30,40 @@ jobs:
             -e "s|__GOOGLE_CLIENT_ID__|$GOOGLE_CLIENT_ID|" \
             -e "s|__GOOGLE_PICKER_API_KEY__|$GOOGLE_PICKER_API_KEY|" \
             js/config.template.js > js/config.js
+      - name: Générer portfolio.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "v0.0.0")
+          VERSION=${TAG#v}
+          MAJOR=${VERSION%%.*}
+          STATUS="prerelease"
+          [ "$MAJOR" != "0" ] && STATUS="release"
+          UPDATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          python3 - "$VERSION" "$STATUS" "$UPDATED_AT" <<'EOF'
+          import json, sys
+          version, status, updated_at = sys.argv[1:4]
+          portfolio = {
+              "name": "Logbook",
+              "slug": "logbook",
+              "version": version,
+              "status": status,
+              "updatedAt": updated_at,
+              "description": {"fr": "TODO", "en": "TODO"},
+              "tagline": {"fr": "TODO", "en": "TODO"},
+              "stack": ["HTML", "CSS", "JavaScript", "Google Drive API"],
+              "tags": ["TODO"],
+              "links": {
+                  "repo": "https://github.com/lchouville/logbook",
+                  "demo": "https://lchouville.github.io/logbook/",
+                  "docs": {"fr": "TODO", "en": "TODO"},
+              },
+              "images": {"screenshots": [], "logo": "TODO"},
+              "author": {"name": "TODO"},
+          }
+          with open("portfolio.json", "w", encoding="utf-8") as f:
+              json.dump(portfolio, f, ensure_ascii=False, indent=2)
+          EOF
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
