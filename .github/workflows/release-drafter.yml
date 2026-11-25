@@ -2,7 +2,7 @@ name: Release Drafter
 
 on:
   push:
-    branches: [develop, gh-page]
+    branches: [develop, main]
   pull_request:
     types: [opened, reopened, synchronize]
 

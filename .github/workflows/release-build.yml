@@ -1,0 +1,52 @@
+name: Release Build
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Construire le dossier de distribution
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir -p "dist/$TAG"
+          cp -r index.html confidentialite.html partage.html css js models "dist/$TAG/"
+          cp js/config.template.js "dist/$TAG/js/"
+          rm -f "dist/$TAG/js/config.js"
+          cp -r "dist/$TAG" dist/latest
+
+      - name: Publier la version ${{ github.event.release.tag_name }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: release
+          publish_dir: dist/${{ github.event.release.tag_name }}
+          destination_dir: ${{ github.event.release.tag_name }}
+          keep_files: true
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+
+      # shortcut: keep_files laisse d'éventuels fichiers supprimés entre deux versions
+      # traîner dans latest/ ; upgrade avec force_orphan sur destination_dir si un jour
+      # une version supprime un fichier et que ça devient un problème réel.
+      - name: Mettre à jour latest/
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: release
+          publish_dir: dist/latest
+          destination_dir: latest
+          keep_files: true
+          force_orphan: false
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
