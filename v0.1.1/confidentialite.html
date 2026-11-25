@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logbook — Politique de confidentialité</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main id="app">
+    <h1>Politique de confidentialité</h1>
+    <p>Dernière mise à jour : 5 novembre 2026.</p>
+
+    <section>
+      <h2>Résumé</h2>
+      <p>Logbook est une application statique (HTML/CSS/JavaScript, sans backend) qui permet de tenir un journal personnel. Elle n'a pas de serveur propre : aucune donnée ne transite par une infrastructure contrôlée par le développeur. Les entrées du journal sont stockées exclusivement dans le Google Drive de la personne qui utilise l'application.</p>
+    </section>
+
+    <section>
+      <h2>Connexion avec Google</h2>
+      <p>La connexion se fait via Google (OAuth, Google Identity Services). Aucun compte ni mot de passe propre à l'application n'est créé ou stocké.</p>
+    </section>
+
+    <section>
+      <h2>Données consultées et stockées</h2>
+      <p>L'application utilise le scope Google Drive <code>drive.file</code> : elle ne peut voir et modifier que les fichiers et dossiers qu'elle crée elle-même (un dossier <code>Application/logbook</code> dans le Drive de l'utilisateur, contenant les entrées du journal, les préférences et, le cas échéant, les fichiers liés au partage). Elle n'a accès à aucun autre fichier du Drive de l'utilisateur.</p>
+      <p>Ces données (thèmes, niveaux d'accès, statut, mesures, texte des entrées) restent dans le Drive de l'utilisateur. Le développeur n'y a pas accès et ne les copie, n'en fait aucune sauvegarde et ne les transmet à aucun tiers.</p>
+    </section>
+
+    <section>
+      <h2>Fonction de partage</h2>
+      <p>L'utilisateur peut choisir de partager un sous-ensemble filtré de ses entrées avec une personne précise, en lui donnant accès à un fichier dédié (créé dans son propre Drive) via les permissions standard de Google Drive. L'application ne stocke ni ne transmet ces données ailleurs que dans le Drive de l'utilisateur et, via les permissions Drive, dans celui de la personne invitée.</p>
+    </section>
+
+    <section>
+      <h2>Retrait de l'accès</h2>
+      <p>L'utilisateur peut révoquer l'accès de l'application à tout moment depuis les paramètres de son compte Google (<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>), ou supprimer directement le dossier <code>Application/logbook</code> dans son Drive.</p>
+    </section>
+
+    <section>
+      <h2>Contact</h2>
+      <p>Pour toute question relative à cette politique de confidentialité : <a href="mailto:luka.chouville.pro@gmail.com">luka.chouville.pro@gmail.com</a>.</p>
+    </section>
+  </main>
+</body>
+</html>
