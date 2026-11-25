@@ -2495,13 +2495,18 @@ entryMoveSubmitButton.addEventListener('click', async () => {
   }
   const moved = entries.filter((e) => selectedEntryIds.has(e.id));
   const previousEntries = entries;
-  entries = entries.filter((e) => !selectedEntryIds.has(e.id));
+  const remaining = entries.filter((e) => !selectedEntryIds.has(e.id));
   try {
     const targetEntries = await loadEntries(targetDashboardId);
     const targetExistingIds = new Set(targetEntries.map((e) => e.id));
     const toAdd = moved.filter((e) => !targetExistingIds.has(e.id));
-    await saveEntries(entries);
+    // Écrit la destination avant de retirer la source : si cet appel échoue, la
+    // source n'a pas bougé (rien à annuler) ; si c'est le retrait de la source qui
+    // échoue ensuite, les entrées se retrouvent dupliquées (récupérable) plutôt que
+    // perdues (si on écrivait la source en premier et que la destination échouait).
     await saveEntries([...targetEntries, ...toAdd], targetDashboardId);
+    entries = remaining;
+    await saveEntries(entries);
     for (const entry of toAdd) {
       for (const field of entry.champsSchema.fields) {
         if (field.type === 'photo' && entry.champsPersonnalises[field.id]) {
