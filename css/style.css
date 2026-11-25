@@ -807,6 +807,49 @@ form button[type="submit"] {
   padding: 2rem 0.625rem;
 }
 
+#entry-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+#entry-filters input,
+#entry-filters select {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+#entry-search-input {
+  flex: 1 1 12rem;
+}
+
+#entry-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg-hover);
+  border-radius: var(--radius-sm);
+}
+
+#entry-bulk-count {
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+#entry-table th:first-child,
+#entry-table td:first-child {
+  width: 1.5rem;
+  padding-right: 0;
+}
+
+#entry-table-body tr.entry-row-archived {
+  opacity: 0.55;
+}
+
 .card-list .list-message {
   background: transparent;
   border-style: dashed;

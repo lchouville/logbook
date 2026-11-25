@@ -244,6 +244,23 @@ async function getPhotosFolderId() {
   return photosFolderIdCache;
 }
 
+// Déplace une photo vers le dossier "photos" d'un autre dashboard (déplacement
+// d'entrée entre dashboards) : sans ça, le fichier resterait dans l'ancien
+// dossier alors que l'entrée qui le référence a changé de dashboard.
+export async function movePhotoToDashboard(fileId, targetDashboardId) {
+  const targetPhotosFolderId = await findOrCreateFolder(PHOTOS_FOLDER_NAME, await getDataFolderId(targetDashboardId));
+  const response = await driveFetch(`${filesUrl()}/${fileId}?${new URLSearchParams({ fields: 'parents' })}`);
+  if (!response.ok) throw new Error(`Lecture de la photo Drive : ${await describeError(response)}`);
+  const data = await response.json();
+  const moveParams = new URLSearchParams({
+    addParents: targetPhotosFolderId,
+    removeParents: (data.parents ?? []).join(','),
+    fields: 'id',
+  });
+  const moveResponse = await driveFetch(`${filesUrl()}/${fileId}?${moveParams}`, { method: 'PATCH' });
+  if (!moveResponse.ok) throw new Error(`Déplacement de la photo Drive : ${await describeError(moveResponse)}`);
+}
+
 export async function uploadPhoto(file, fieldId) {
   const metadata = { name: `${fieldId}-${crypto.randomUUID()}`, mimeType: file.type || 'image/jpeg', parents: [await getPhotosFolderId()] };
   const form = new FormData();

@@ -10,6 +10,8 @@ const SECTION_IDS = [
   'integration-progress-modal',
   'mapping-correction-modal',
   'inspection-fiche-modal',
+  'entry-move-modal',
+  'entry-modele-change-modal',
 ];
 const WIDE_SECTION_IDS = ['entry-form-modal', 'modele-form-modal'];
 const closeListeners = [];

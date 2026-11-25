@@ -33,6 +33,7 @@ import {
   createDashboardFolder,
   expectedDossierNom,
   deletePhoto,
+  movePhotoToDashboard,
   listIntegrationFiles,
   loadIntegrationFile,
   deleteIntegrationFile,
@@ -143,6 +144,27 @@ const entryBlocksList = document.getElementById('entry-blocks-list');
 const entryAddFieldButton = document.getElementById('entry-add-field-button');
 const entryTableBody = document.getElementById('entry-table-body');
 const entryError = document.getElementById('entry-error');
+const entrySearchInput = document.getElementById('entry-search-input');
+const entryFilterTheme = document.getElementById('entry-filter-theme');
+const entryFilterStatut = document.getElementById('entry-filter-statut');
+const entryFilterNiveau = document.getElementById('entry-filter-niveau');
+const entryFilterModele = document.getElementById('entry-filter-modele');
+const entryFilterDateFrom = document.getElementById('entry-filter-date-from');
+const entryFilterDateTo = document.getElementById('entry-filter-date-to');
+const entryFilterArchive = document.getElementById('entry-filter-archive');
+const entrySelectAllCheckbox = document.getElementById('entry-select-all');
+const entryBulkActions = document.getElementById('entry-bulk-actions');
+const entryBulkCount = document.getElementById('entry-bulk-count');
+const entryBulkDeleteButton = document.getElementById('entry-bulk-delete');
+const entryBulkMoveButton = document.getElementById('entry-bulk-move');
+const entryBulkArchiveButton = document.getElementById('entry-bulk-archive');
+const entryBulkModeleButton = document.getElementById('entry-bulk-modele');
+const entryMoveDashboardSelect = document.getElementById('entry-move-dashboard');
+const entryMoveError = document.getElementById('entry-move-error');
+const entryMoveSubmitButton = document.getElementById('entry-move-submit');
+const entryModeleChangeSelect = document.getElementById('entry-modele-change-select');
+const entryModeleChangeError = document.getElementById('entry-modele-change-error');
+const entryModeleChangeSubmitButton = document.getElementById('entry-modele-change-submit');
 const partageForm = document.getElementById('partage-form');
 const partageDashboardSelect = document.getElementById('partage-dashboard');
 const partageNom = document.getElementById('partage-nom');
@@ -210,6 +232,27 @@ let activeDashboardId = 'default';
 // `partages`/`entries` (qui, eux, restent toujours ceux du dashboard actif).
 let partageViewDashboardId = null;
 let partageViewPartages = [];
+
+const entryFilters = { search: '', theme: '', statut: '', niveau: '', modeleId: '', dateFrom: '', dateTo: '', archive: 'entries' };
+let selectedEntryIds = new Set();
+
+function getFilteredEntries() {
+  const search = entryFilters.search.trim().toLowerCase();
+  return [...entries]
+    .filter((e) => {
+      if (entryFilters.archive === 'entries' && e.archive) return false;
+      if (entryFilters.archive === 'archived' && !e.archive) return false;
+      if (search && !`${e.titre ?? ''} ${previewContenuTexte(e)}`.toLowerCase().includes(search)) return false;
+      if (entryFilters.theme && !e.themes.includes(entryFilters.theme)) return false;
+      if (entryFilters.statut && e.statut !== entryFilters.statut) return false;
+      if (entryFilters.niveau && e.niveauAcces !== entryFilters.niveau) return false;
+      if (entryFilters.modeleId && e.modeleId !== entryFilters.modeleId) return false;
+      if (entryFilters.dateFrom && e.date < entryFilters.dateFrom) return false;
+      if (entryFilters.dateTo && e.date > entryFilters.dateTo) return false;
+      return true;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date) || a.titre.localeCompare(b.titre));
+}
 
 function buildSharedFileName(nom) {
   return `${(ownerName ?? 'Logbook').trim()} — ${nom.trim()}.json`;
@@ -292,6 +335,37 @@ populateSelect(entryStatut, STATUTS);
 populateSelect(modeleThemes, THEMES);
 populateSelect(modeleNiveau, NIVEAUX_ACCES);
 populateSelect(modeleStatut, STATUTS);
+
+function populateFilterSelect(select, options, placeholder) {
+  const emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = placeholder;
+  select.appendChild(emptyOption);
+  populateSelect(select, options);
+}
+
+populateFilterSelect(entryFilterTheme, THEMES, 'Tous les thèmes');
+populateFilterSelect(entryFilterStatut, STATUTS, 'Tous les statuts');
+populateFilterSelect(entryFilterNiveau, NIVEAUX_ACCES, 'Tous les niveaux');
+
+entrySearchInput.addEventListener('input', () => {
+  entryFilters.search = entrySearchInput.value;
+  renderEntries();
+});
+for (const [el, key] of [
+  [entryFilterTheme, 'theme'],
+  [entryFilterStatut, 'statut'],
+  [entryFilterNiveau, 'niveau'],
+  [entryFilterModele, 'modeleId'],
+  [entryFilterDateFrom, 'dateFrom'],
+  [entryFilterDateTo, 'dateTo'],
+  [entryFilterArchive, 'archive'],
+]) {
+  el.addEventListener('change', () => {
+    entryFilters[key] = el.value;
+    renderEntries();
+  });
+}
 
 function blankChampsSchema() {
   return { fields: [], order: [...FIXED_BLOCK_KEYS] };
@@ -496,19 +570,44 @@ function getEntriesLoadMoreObserver() {
   return entriesLoadMoreObserver;
 }
 
+function renderBulkActions() {
+  const count = selectedEntryIds.size;
+  entryBulkActions.hidden = count === 0;
+  if (count === 0) return;
+  entryBulkCount.textContent = `${count} entrée${count > 1 ? 's' : ''} sélectionnée${count > 1 ? 's' : ''}`;
+  const selected = entries.filter((e) => selectedEntryIds.has(e.id));
+  entryBulkArchiveButton.textContent = selected.every((e) => e.archive) ? 'Désarchiver' : 'Archiver';
+}
+
 function renderEntries() {
   entryTableBody.innerHTML = '';
-  if (entries.length === 0) {
-    renderTableMessage(entryTableBody, 6, 'Aucune entrée. Créez-en une avec « + Nouvelle entrée ».');
+  // La sélection ne doit pas survivre à la disparition d'une entrée (suppression,
+  // déplacement) ni rester cochée pour une entrée qui sort du filtre actif.
+  const filtered = getFilteredEntries();
+  const filteredIds = new Set(filtered.map((e) => e.id));
+  selectedEntryIds = new Set([...selectedEntryIds].filter((id) => filteredIds.has(id)));
+  if (filtered.length === 0) {
+    renderTableMessage(entryTableBody, 7, 'Aucune entrée.');
+    entrySelectAllCheckbox.checked = false;
+    entrySelectAllCheckbox.indeterminate = false;
+    renderBulkActions();
     return;
   }
-  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date) || a.titre.localeCompare(b.titre));
-  const visible = sorted.slice(0, entriesVisibleCount);
+  const visible = filtered.slice(0, entriesVisibleCount);
 
   for (const entry of visible) {
     const row = document.createElement('tr');
     row.dataset.entryId = entry.id;
     row.tabIndex = 0;
+    if (entry.archive) row.classList.add('entry-row-archived');
+
+    const checkboxCell = document.createElement('td');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = selectedEntryIds.has(entry.id);
+    checkbox.setAttribute('aria-label', `Sélectionner ${entry.titre || 'cette entrée'}`);
+    checkboxCell.appendChild(checkbox);
+    row.appendChild(checkboxCell);
 
     appendCell(row, entry.date);
     appendCell(row, entry.titre ?? '');
@@ -520,12 +619,16 @@ function renderEntries() {
     entryTableBody.appendChild(row);
   }
 
+  entrySelectAllCheckbox.checked = filtered.every((e) => selectedEntryIds.has(e.id));
+  entrySelectAllCheckbox.indeterminate = !entrySelectAllCheckbox.checked && selectedEntryIds.size > 0;
+  renderBulkActions();
+
   const observer = getEntriesLoadMoreObserver();
   observer.disconnect();
-  if (visible.length < sorted.length) {
+  if (visible.length < filtered.length) {
     const sentinelRow = document.createElement('tr');
     const sentinelCell = document.createElement('td');
-    sentinelCell.colSpan = 6;
+    sentinelCell.colSpan = 7;
     sentinelRow.appendChild(sentinelCell);
     entryTableBody.appendChild(sentinelRow);
     observer.observe(sentinelRow);
@@ -2246,6 +2349,19 @@ function renderEntryNewMenu() {
       entryNewMenu.appendChild(bilanButton);
     }
   }
+  entryFilterModele.innerHTML = '';
+  const emptyFilterOption = document.createElement('option');
+  emptyFilterOption.value = '';
+  emptyFilterOption.textContent = 'Tous les modèles';
+  entryFilterModele.appendChild(emptyFilterOption);
+  entryModeleChangeSelect.innerHTML = '';
+  for (const modele of modeles) {
+    const filterOption = document.createElement('option');
+    filterOption.value = modele.id;
+    filterOption.textContent = modele.nom;
+    entryFilterModele.appendChild(filterOption);
+    entryModeleChangeSelect.appendChild(filterOption.cloneNode(true));
+  }
 }
 
 entryNewButton.addEventListener('click', (event) => {
@@ -2290,7 +2406,17 @@ entryDate.addEventListener('change', () => {
   }
 });
 
+entryTableBody.addEventListener('change', (event) => {
+  if (event.target.type !== 'checkbox') return;
+  const row = event.target.closest('tr');
+  if (!row?.dataset.entryId) return;
+  if (event.target.checked) selectedEntryIds.add(row.dataset.entryId);
+  else selectedEntryIds.delete(row.dataset.entryId);
+  renderEntries();
+});
+
 entryTableBody.addEventListener('click', (event) => {
+  if (event.target.type === 'checkbox') return;
   const row = event.target.closest('tr');
   const entry = row && entries.find((e) => e.id === row.dataset.entryId);
   if (entry) startEditEntry(entry);
@@ -2298,11 +2424,137 @@ entryTableBody.addEventListener('click', (event) => {
 
 entryTableBody.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
+  if (event.target.type === 'checkbox') return;
   const row = event.target.closest('tr');
   const entry = row && entries.find((e) => e.id === row.dataset.entryId);
   if (!entry) return;
   event.preventDefault();
   startEditEntry(entry);
+});
+
+entrySelectAllCheckbox.addEventListener('change', () => {
+  const filtered = getFilteredEntries();
+  if (entrySelectAllCheckbox.checked) selectedEntryIds = new Set(filtered.map((e) => e.id));
+  else selectedEntryIds = new Set();
+  renderEntries();
+});
+
+entryBulkDeleteButton.addEventListener('click', async () => {
+  const count = selectedEntryIds.size;
+  if (!window.confirm(`Supprimer définitivement ${count} entrée${count > 1 ? 's' : ''} ?`)) return;
+  const previousEntries = entries;
+  const deleted = entries.filter((e) => selectedEntryIds.has(e.id));
+  entries = entries.filter((e) => !selectedEntryIds.has(e.id));
+  try {
+    await saveEntries(entries);
+    for (const entry of deleted) {
+      entry.champsSchema.fields
+        .filter((f) => f.type === 'photo' && entry.champsPersonnalises[f.id])
+        .forEach((f) => deletePhoto(entry.champsPersonnalises[f.id]).catch(() => {}));
+    }
+    await syncPartages();
+    selectedEntryIds = new Set();
+    renderEntries();
+  } catch (error) {
+    entries = previousEntries;
+    window.alert(`Échec de la suppression : ${error.message}`);
+  }
+});
+
+entryBulkArchiveButton.addEventListener('click', async () => {
+  const selected = entries.filter((e) => selectedEntryIds.has(e.id));
+  const nextArchive = !selected.every((e) => e.archive);
+  const previousEntries = entries;
+  entries = entries.map((e) => (selectedEntryIds.has(e.id) ? { ...e, archive: nextArchive } : e));
+  try {
+    await saveEntries(entries);
+    selectedEntryIds = new Set();
+    renderEntries();
+  } catch (error) {
+    entries = previousEntries;
+    window.alert(`Échec de l'archivage : ${error.message}`);
+  }
+});
+
+entryBulkMoveButton.addEventListener('click', () => {
+  entryMoveError.textContent = '';
+  entryMoveDashboardSelect.innerHTML = '';
+  appendDashboardOptions(
+    entryMoveDashboardSelect,
+    dashboards.filter((d) => !d.archive && d.id !== activeDashboardId),
+    'Choisir un tableau…',
+  );
+  openModal('entry-move-modal');
+});
+
+entryMoveSubmitButton.addEventListener('click', async () => {
+  const targetDashboardId = entryMoveDashboardSelect.value;
+  if (!targetDashboardId) {
+    entryMoveError.textContent = 'Choisis un tableau de bord de destination.';
+    return;
+  }
+  const moved = entries.filter((e) => selectedEntryIds.has(e.id));
+  const previousEntries = entries;
+  entries = entries.filter((e) => !selectedEntryIds.has(e.id));
+  try {
+    const targetEntries = await loadEntries(targetDashboardId);
+    const targetExistingIds = new Set(targetEntries.map((e) => e.id));
+    const toAdd = moved.filter((e) => !targetExistingIds.has(e.id));
+    await saveEntries(entries);
+    await saveEntries([...targetEntries, ...toAdd], targetDashboardId);
+    for (const entry of toAdd) {
+      for (const field of entry.champsSchema.fields) {
+        if (field.type === 'photo' && entry.champsPersonnalises[field.id]) {
+          await movePhotoToDashboard(entry.champsPersonnalises[field.id], targetDashboardId).catch(() => {});
+        }
+      }
+    }
+    await syncPartages();
+    selectedEntryIds = new Set();
+    renderEntries();
+    closeModal();
+  } catch (error) {
+    entries = previousEntries;
+    entryMoveError.textContent = `Échec du déplacement : ${error.message}`;
+  }
+});
+
+entryBulkModeleButton.addEventListener('click', () => {
+  entryModeleChangeError.textContent = '';
+  openModal('entry-modele-change-modal');
+});
+
+entryModeleChangeSubmitButton.addEventListener('click', async () => {
+  const modele = modeles.find((m) => m.id === entryModeleChangeSelect.value);
+  if (!modele) {
+    entryModeleChangeError.textContent = 'Choisis un modèle.';
+    return;
+  }
+  closeModal();
+  const previousEntries = entries;
+  const idsToUpdate = [...selectedEntryIds];
+  try {
+    for (const id of idsToUpdate) {
+      const entry = entries.find((e) => e.id === id);
+      if (!entry) continue;
+      const classe = classerFiche({ error: null, targetModeleId: modele.id, data: { contenuSchema: entry.contenuSchema } }).classe;
+      const { contenuSchema, contenuValeurs, champsVides } = await remapContenuVersModele(
+        entry.contenuSchema,
+        entry.contenuValeurs,
+        modele,
+      );
+      let statut = entry.statut;
+      if (champsVides) statut = 'A Compléter';
+      else if (classe === 'champs-supplementaire' || classe === 'mapping-necessaire') statut = 'A Valider';
+      entries = entries.map((e) => (e.id === id ? { ...e, modeleId: modele.id, contenuSchema, contenuValeurs, statut } : e));
+    }
+    await saveEntries(entries);
+    selectedEntryIds = new Set();
+    renderEntries();
+  } catch (error) {
+    entries = previousEntries;
+    window.alert(`Échec du changement de modèle : ${error.message}`);
+  }
 });
 
 entryForm.addEventListener('submit', async (event) => {
@@ -2527,7 +2779,7 @@ async function loadAccountData() {
   partageError.textContent = '';
   partagesRecusError.textContent = '';
   modeleError.textContent = '';
-  renderTableLoading(entryTableBody, 6);
+  renderTableLoading(entryTableBody, 7);
   renderLoading(partageList);
   renderLoading(partagesRecusList);
   renderLoading(modeleList);
