@@ -77,3 +77,12 @@
 
 - docs: add release notes for v0.1.1 (#74)
 
+
+## v0.2.1 - 2026-11-26
+
+## Changements
+
+## 🐛 Corrections
+
+- hotfix: v0.2.1 (#79)
+
