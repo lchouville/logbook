@@ -9,7 +9,7 @@
 <body>
   <main id="app">
     <h1>Politique de confidentialité</h1>
-    <p>Dernière mise à jour : 5 novembre 2026.</p>
+    <p>Dernière mise à jour : 26 novembre 2026.</p>
 
     <section>
       <h2>Résumé</h2>
@@ -23,7 +23,7 @@
 
     <section>
       <h2>Données consultées et stockées</h2>
-      <p>L'application utilise le scope Google Drive <code>drive.file</code> : elle ne peut voir et modifier que les fichiers et dossiers qu'elle crée elle-même (un dossier <code>Application/logbook</code> dans le Drive de l'utilisateur, contenant les entrées du journal, les préférences et, le cas échéant, les fichiers liés au partage). Elle n'a accès à aucun autre fichier du Drive de l'utilisateur.</p>
+      <p>L'application utilise le scope Google Drive complet (<code>drive</code>) plutôt que le scope restreint <code>drive.file</code>, car elle doit aussi lire les fiches qu'un outil tiers (ex. un assistant IA) peut déposer directement dans le dossier <code>Application/logbook</code> de l'utilisateur en dehors de l'application — ces fichiers restent invisibles à l'application avec le scope restreint, même situés dans le bon dossier. En pratique, Logbook ne lit et n'écrit que dans ce dossier <code>Application/logbook</code> (entrées du journal, préférences, fiches en attente d'intégration, fichiers liés au partage) : le scope plus large n'est techniquement pas limité à ce dossier, mais aucune fonctionnalité de l'application n'accède à d'autres fichiers du Drive de l'utilisateur.</p>
       <p>Ces données (thèmes, niveaux d'accès, statut, mesures, texte des entrées) restent dans le Drive de l'utilisateur. Le développeur n'y a pas accès et ne les copie, n'en fait aucune sauvegarde et ne les transmet à aucun tiers.</p>
     </section>
 
