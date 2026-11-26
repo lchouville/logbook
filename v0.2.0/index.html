@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logbook</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+  <section id="auth">
+    <h1>Logbook</h1>
+    <p>Journal de bord — en construction.</p>
+    <button id="sign-in" type="button">Se connecter avec Google</button>
+    <button id="dev-local-button" type="button" hidden>Mode test local (sans Google)</button>
+    <p id="auth-status">Non connecté.</p>
+  </section>
+
+  <div id="app-shell" hidden>
+    <button id="sidebar-toggle" type="button" aria-label="Ouvrir/fermer le menu">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1 4h14M1 8h14M1 12h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <nav id="sidebar">
+      <div id="sidebar-profile">
+        <button id="sidebar-profile-button" type="button" aria-haspopup="true" aria-expanded="false">
+          <span id="sidebar-owner-avatar" aria-hidden="true"></span>
+          <span id="sidebar-owner-name"></span>
+          <span id="sidebar-profile-chevron" aria-hidden="true">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+        <div id="sidebar-profile-menu" hidden>
+          <button id="sidebar-settings-button" type="button">Paramètres</button>
+          <button id="sign-out" type="button">Se déconnecter</button>
+        </div>
+      </div>
+      <ul id="sidebar-dashboards"></ul>
+      <p id="sidebar-dashboards-error" role="alert"></p>
+      <button id="sidebar-dashboards-archived-toggle" type="button" hidden>Voir les tableaux archivés</button>
+      <ul id="sidebar-dashboards-archived" hidden></ul>
+      <ul id="sidebar-journaux"></ul>
+      <button id="sidebar-journaux-plus" type="button" hidden>Voir tout</button>
+      <button id="sidebar-partage-button" type="button">Partage</button>
+      <button id="sidebar-integration-button" type="button">Intégration</button>
+      <button id="sidebar-modeles-button" type="button">Modèles</button>
+    </nav>
+    <main id="main-content" tabindex="-1">
+      <section id="entries">
+        <div id="entries-header">
+          <h2>Entrées</h2>
+          <div id="entries-header-actions">
+            <button id="dashboards-export-button" type="button">Exporter les tableaux de bord</button>
+            <button id="dashboards-import-button" type="button">Importer les tableaux de bord</button>
+            <input id="dashboards-import-file-input" type="file" accept="application/json" hidden>
+            <div id="entry-import-wrapper">
+              <button id="entry-import-button" type="button" aria-haspopup="true" aria-expanded="false">Importer</button>
+              <div id="entry-import-menu" hidden>
+                <button id="entry-import-upload-button" type="button">Uploader un fichier</button>
+                <button id="entry-import-drive-button" type="button">Depuis le Drive</button>
+                <input id="entry-import-file-input" type="file" accept="application/json" hidden>
+              </div>
+            </div>
+            <div id="entry-new-wrapper">
+              <button id="entry-new-button" type="button" aria-haspopup="true" aria-expanded="false">+ Nouvelle entrée</button>
+              <div id="entry-new-menu" hidden>
+                <button type="button" data-modele-id="">Entrée vierge</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p id="entry-import-error" role="alert"></p>
+        <div id="entry-filters">
+          <label for="entry-search-input" class="sr-only">Rechercher</label>
+          <input id="entry-search-input" type="search" placeholder="Rechercher…">
+          <label for="entry-filter-theme" class="sr-only">Thème</label>
+          <select id="entry-filter-theme"></select>
+          <label for="entry-filter-statut" class="sr-only">Statut</label>
+          <select id="entry-filter-statut"></select>
+          <label for="entry-filter-niveau" class="sr-only">Niveau</label>
+          <select id="entry-filter-niveau"></select>
+          <label for="entry-filter-modele" class="sr-only">Modèle</label>
+          <select id="entry-filter-modele"></select>
+          <label for="entry-filter-date-from" class="sr-only">Du</label>
+          <input id="entry-filter-date-from" type="date">
+          <label for="entry-filter-date-to" class="sr-only">Au</label>
+          <input id="entry-filter-date-to" type="date">
+          <label for="entry-filter-archive" class="sr-only">Entrées à afficher</label>
+          <select id="entry-filter-archive">
+            <option value="entries">Entrées</option>
+            <option value="all">Toutes</option>
+            <option value="archived">Archivées</option>
+          </select>
+        </div>
+        <div id="entry-bulk-actions" hidden>
+          <span id="entry-bulk-count"></span>
+          <button id="entry-bulk-delete" type="button" class="button-danger">Supprimer</button>
+          <button id="entry-bulk-move" type="button">Déplacer vers…</button>
+          <button id="entry-bulk-archive" type="button">Archiver</button>
+          <button id="entry-bulk-modele" type="button">Changer de modèle</button>
+        </div>
+        <div class="table-wrapper" id="entry-table-wrapper">
+          <table id="entry-table">
+            <thead>
+              <tr>
+                <th scope="col"><input id="entry-select-all" type="checkbox" aria-label="Tout sélectionner"></th>
+                <th scope="col">Date</th>
+                <th scope="col">Titre</th>
+                <th scope="col">Thème(s)</th>
+                <th scope="col">Niveau</th>
+                <th scope="col">Statut</th>
+                <th scope="col">Texte</th>
+              </tr>
+            </thead>
+            <tbody id="entry-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="integration" hidden>
+        <h2>Intégration</h2>
+        <p id="integration-count"></p>
+        <p id="integration-error" role="alert"></p>
+        <ul id="integration-list" class="card-list"></ul>
+      </section>
+
+      <section id="modeles" hidden>
+        <div id="modeles-header">
+          <h2>Modèles</h2>
+          <button id="modeles-export-button" type="button">Exporter les modèles</button>
+          <button id="modeles-import-button" type="button">Importer les modèles</button>
+          <input id="modeles-import-file-input" type="file" accept="application/json" hidden>
+          <button id="modele-new-button" type="button">+ Nouveau modèle</button>
+        </div>
+        <p id="modele-error" role="alert"></p>
+        <h3>Modèles par défaut</h3>
+        <ul id="modele-list-defaut" class="card-list"></ul>
+        <h3>Mes modèles</h3>
+        <ul id="modele-list" class="card-list"></ul>
+      </section>
+
+      <div id="schema-field-popover" hidden>
+        <form id="schema-field-form">
+          <label for="schema-field-nom">Nom</label>
+          <input id="schema-field-nom" type="text" required>
+
+          <p id="schema-field-type-readonly" hidden></p>
+
+          <label for="schema-field-type">Type</label>
+          <select id="schema-field-type">
+            <option value="texte">Texte</option>
+            <option value="nombre">Nombre</option>
+            <option value="date">Date</option>
+            <option value="select">Liste</option>
+            <option value="case">Case à cocher</option>
+            <option value="photo">Photo</option>
+          </select>
+
+          <label for="schema-field-options">Options (séparées par des virgules)</label>
+          <input id="schema-field-options" type="text" hidden>
+
+          <button type="submit">Enregistrer</button>
+          <button id="schema-field-delete" type="button" class="button-danger" hidden>Supprimer</button>
+        </form>
+      </div>
+
+      <section id="journal-partage" hidden>
+        <h2>Entrées</h2>
+        <button id="viewer-grant-access" type="button" hidden>Donner l'accès au fichier partagé</button>
+        <p id="viewer-error" role="alert"></p>
+        <div class="table-wrapper">
+          <table id="viewer-table">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Titre</th>
+                <th scope="col">Thème(s)</th>
+                <th scope="col">Niveau</th>
+                <th scope="col">Statut</th>
+                <th scope="col">Texte</th>
+                <th scope="col">Ressenti à froid</th>
+              </tr>
+            </thead>
+            <tbody id="viewer-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="settings" hidden>
+        <h2>Paramètres</h2>
+        <label for="theme-select">Thème</label>
+        <select id="theme-select">
+          <option value="device">Appareil</option>
+          <option value="light">Clair</option>
+          <option value="dark">Sombre</option>
+        </select>
+
+        <label for="session-duration-select">Rester connecté</label>
+        <select id="session-duration-select">
+          <option value="1h">1 heure</option>
+          <option value="5h">5 heures</option>
+          <option value="1j">1 jour</option>
+          <option value="7j">7 jours</option>
+          <option value="30j">30 jours</option>
+          <option value="4mois">4 mois</option>
+          <option value="8mois">8 mois</option>
+          <option value="1an">1 an</option>
+          <option value="jamais">Jamais (illimité)</option>
+        </select>
+        <p class="field-hint">Au-delà de cette durée depuis ta dernière connexion, l'app te redemandera de te reconnecter explicitement — propre à ce navigateur, pas synchronisé.</p>
+
+        <label for="entries-page-size-select">Entrées chargées à la fois</label>
+        <select id="entries-page-size-select">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+
+        <label for="confirm-dashboard-delete-checkbox">
+          <input id="confirm-dashboard-delete-checkbox" type="checkbox">
+          Confirmer la suppression d'un tableau de bord en retapant son nom
+        </label>
+
+        <button id="settings-change-logbook-folder-button" type="button">Changer de dossier Logbook</button>
+
+        <p id="settings-error" role="alert"></p>
+        <p><a href="confidentialite.html">Politique de confidentialité</a></p>
+        <p id="app-version" class="field-hint"></p>
+      </section>
+
+      <section id="partages" hidden>
+        <h2>Partages</h2>
+        <form id="partage-form">
+          <label for="partage-dashboard">Tableau de bord à partager</label>
+          <select id="partage-dashboard"></select>
+
+          <label for="partage-nom">Nom</label>
+          <input id="partage-nom" type="text" required>
+
+          <label for="partage-email">Email Google de la personne invitée</label>
+          <input id="partage-email" type="email" required>
+
+          <fieldset id="partage-regles">
+            <legend>Visible par thème et niveau</legend>
+          </fieldset>
+
+          <button id="partage-submit" type="submit">Créer le partage</button>
+          <button id="partage-cancel" type="button" hidden>Annuler</button>
+        </form>
+        <p id="partage-error" role="alert"></p>
+        <ul id="partage-list" class="card-list"></ul>
+      </section>
+
+      <section id="partages-recus" hidden>
+        <h2>Accès</h2>
+        <p id="partages-recus-error" role="alert"></p>
+        <ul id="partages-recus-list" class="card-list"></ul>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal-root" hidden>
+    <div id="modal-backdrop"></div>
+    <div id="modal-panel" role="dialog" aria-modal="true">
+      <button id="modal-close" type="button" aria-label="Fermer">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <section id="logbook-folder-modal" hidden>
+        <h2>Dossier Logbook</h2>
+        <p>Choisis le dossier Drive où l'app range toutes ses données (dashboards, entrées, modèles).</p>
+        <button id="logbook-folder-connect-button" type="button">Connecter mon dossier Drive « Logbook » existant</button>
+        <button id="logbook-folder-create-button" type="button">Créer un nouveau dossier Logbook</button>
+        <p id="logbook-folder-modal-error" role="alert"></p>
+      </section>
+      <section id="integration-progress-modal" hidden>
+        <h2 id="integration-progress-title">Traitement en cours…</h2>
+        <progress id="integration-progress-bar" value="0" max="1"></progress>
+        <p id="integration-progress-count"></p>
+        <p>Ne modifie pas les tableaux de bord ou les entrées pendant ce traitement.</p>
+      </section>
+      <section id="mapping-correction-modal" hidden>
+        <h2>Correction du mappage</h2>
+        <p>Ces champs du modèle n'ont pas de correspondance évidente dans la fiche importée. Relie-les si besoin — ce qui reste sans lien sera ajouté en texte brut dans l'entrée.</p>
+        <ul id="mapping-correction-list" class="card-list"></ul>
+        <button id="mapping-correction-submit" type="button">Valider le mappage</button>
+      </section>
+      <section id="entry-move-modal" hidden>
+        <h2>Déplacer les entrées</h2>
+        <label for="entry-move-dashboard">Tableau de bord de destination</label>
+        <select id="entry-move-dashboard"></select>
+        <p id="entry-move-error" role="alert"></p>
+        <button id="entry-move-submit" type="button">Déplacer</button>
+      </section>
+      <section id="entry-modele-change-modal" hidden>
+        <h2>Changer de modèle</h2>
+        <label for="entry-modele-change-select">Nouveau modèle</label>
+        <select id="entry-modele-change-select"></select>
+        <p id="entry-modele-change-error" role="alert"></p>
+        <button id="entry-modele-change-submit" type="button">Appliquer</button>
+      </section>
+      <section id="inspection-fiche-modal" hidden>
+        <h2 id="inspection-fiche-title">Inspection</h2>
+        <div id="inspection-fiche-detail"></div>
+        <ul id="inspection-fiche-mapping-list" class="card-list"></ul>
+        <div class="partage-actions">
+          <button id="inspection-fiche-integrer" type="button">Intégrer</button>
+          <button id="inspection-fiche-rejeter" type="button" class="button-danger">Rejeter</button>
+        </div>
+      </section>
+      <section id="entry-form-modal" hidden>
+        <h2 id="entry-form-title">Nouvelle entrée</h2>
+        <form id="entry-form">
+          <fieldset id="entry-form-fields">
+            <legend class="sr-only">Détails de l'entrée</legend>
+            <label for="entry-titre" class="sr-only">Titre</label>
+            <input id="entry-titre" type="text" class="entry-page-title" placeholder="Sans titre" required>
+
+            <div id="entry-properties">
+              <div class="entry-property-row">
+                <label for="entry-date" class="entry-property-label">Date</label>
+                <input id="entry-date" type="date" class="entry-property-value" required>
+              </div>
+            </div>
+
+            <div id="entry-blocks-section" class="fields-editor-section">
+              <ul id="entry-blocks-list" class="fields-editor-list">
+                <li class="entry-block-row" draggable="true" data-order-key="themes">
+                  <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
+                  <label for="entry-themes">Thème(s)</label>
+                  <select id="entry-themes" multiple required></select>
+                </li>
+                <li class="entry-block-row" draggable="true" data-order-key="niveau">
+                  <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
+                  <label for="entry-niveau">Niveau d'accès</label>
+                  <select id="entry-niveau" required>
+                    <option value="" disabled selected>Choisir…</option>
+                  </select>
+                </li>
+                <li class="entry-block-row" draggable="true" data-order-key="statut">
+                  <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
+                  <label for="entry-statut">Statut</label>
+                  <select id="entry-statut" required>
+                    <option value="" disabled selected>Choisir…</option>
+                  </select>
+                </li>
+              </ul>
+              <button id="entry-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
+            </div>
+
+            <div id="entry-ressenti-froid-slot" class="entry-property-row" hidden></div>
+
+            <div id="entry-contenu-section" class="contenu-section">
+              <h3 class="contenu-section-titre">Contenu</h3>
+              <div id="entry-contenu-list" class="contenu-list"></div>
+              <div class="contenu-add-buttons">
+                <button id="entry-contenu-add-texte" type="button">+ Bloc texte</button>
+                <button id="entry-contenu-add-tableau" type="button">+ Bloc tableau</button>
+              </div>
+            </div>
+          </fieldset>
+
+          <button id="entry-edit" type="button" hidden>Modifier</button>
+          <button id="entry-submit" type="submit">Enregistrer</button>
+          <button id="entry-delete" type="button" hidden>Supprimer l'entrée</button>
+        </form>
+        <p id="entry-error" role="alert"></p>
+      </section>
+      <section id="modele-form-modal" hidden>
+        <h2 id="modele-form-title">Nouveau modèle</h2>
+        <form id="modele-form">
+          <label for="modele-nom">Nom</label>
+          <input id="modele-nom" type="text" required>
+
+          <label for="modele-titre-pattern">Titre d'entrée (pré-rempli à la création)</label>
+          <input id="modele-titre-pattern" type="text" placeholder="ex : Rituel du soir du {date} #{id}">
+          <p class="field-hint">{date} = date du jour, {id} = numéro de l'entrée pour ce modèle</p>
+
+          <div id="modele-fixed-fields">
+            <div class="entry-property-row">
+              <label for="modele-themes">Thème(s)</label>
+              <select id="modele-themes" multiple></select>
+            </div>
+            <div class="entry-property-row">
+              <label for="modele-niveau">Niveau d'accès</label>
+              <select id="modele-niveau">
+                <option value="">—</option>
+              </select>
+            </div>
+            <div class="entry-property-row">
+              <label for="modele-statut">Statut</label>
+              <select id="modele-statut">
+                <option value="">—</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="modele-blocks-section" class="fields-editor-section">
+            <ul id="modele-blocks-list" class="fields-editor-list"></ul>
+            <button id="modele-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
+          </div>
+
+          <div id="modele-contenu-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Contenu</h3>
+            <div id="modele-contenu-list" class="contenu-list"></div>
+            <div class="contenu-add-buttons">
+              <button id="modele-contenu-add-texte" type="button">+ Bloc texte</button>
+              <button id="modele-contenu-add-tableau" type="button">+ Bloc tableau</button>
+            </div>
+          </div>
+
+          <div id="modele-bilans-section" class="contenu-section">
+            <h3 class="contenu-section-titre">Bilans</h3>
+            <p class="field-hint">Un bilan agrège automatiquement les entrées créées via ce modèle (il lui faut un bloc tableau de mesures) sur une semaine ou un mois.</p>
+            <ul id="modele-bilans-list"></ul>
+            <button id="modele-bilan-add-button" type="button" class="fields-editor-add-button">+ Ajouter un bilan</button>
+          </div>
+
+          <button id="modele-submit" type="submit">Créer le modèle</button>
+          <button id="modele-cancel" type="button" hidden>Annuler</button>
+        </form>
+        <p id="modele-form-error" role="alert"></p>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logbook — partage</title>
+  <script type="module">
+    const fileId = new URLSearchParams(window.location.search).get('id');
+    const target = new URL('index.html', window.location.href);
+    if (fileId) target.searchParams.set('journal', fileId);
+    window.location.replace(target.toString());
+  </script>
+</head>
+<body>
+  <p>Redirection…</p>
+</body>
+</html>
