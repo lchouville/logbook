@@ -86,3 +86,12 @@
 
 - hotfix: v0.2.1 (#79)
 
+
+## v0.2.2 - 2026-11-26
+
+## Changements
+
+## 🐛 Corrections
+
+- hotfix: v0.2.2 (#82)
+
