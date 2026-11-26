@@ -43,6 +43,7 @@
       <ul id="sidebar-dashboards-archived" hidden></ul>
       <ul id="sidebar-journaux"></ul>
       <button id="sidebar-journaux-plus" type="button" hidden>Voir tout</button>
+      <button id="sidebar-profile-sheet-button" type="button">Fiche personnelle</button>
       <button id="sidebar-partage-button" type="button">Partage</button>
       <button id="sidebar-integration-button" type="button">Intégration</button>
       <button id="sidebar-modeles-button" type="button">Modèles</button>
@@ -139,6 +140,54 @@
         <ul id="modele-list-defaut" class="card-list"></ul>
         <h3>Mes modèles</h3>
         <ul id="modele-list" class="card-list"></ul>
+      </section>
+
+      <section id="profile" hidden>
+        <div id="profile-header">
+          <h2>Fiche personnelle</h2>
+          <button id="profile-export-button" type="button">Exporter</button>
+        </div>
+        <p class="field-hint">Fiche optionnelle, séparée du journal de bord : rien n'y est pré-rempli ni déduit automatiquement.</p>
+
+        <div id="profile-tabs" role="tablist">
+          <button id="profile-tab-apercu-button" type="button" role="tab" aria-selected="true" aria-controls="profile-panel-apercu">Aperçu</button>
+          <button id="profile-tab-tests-button" type="button" role="tab" aria-selected="false" aria-controls="profile-panel-tests">Tests</button>
+        </div>
+
+        <div id="profile-panel-apercu" role="tabpanel">
+          <section class="profile-sheet-panel">
+            <div class="profile-sheet-panel-title">
+              <span class="profile-sheet-icon" aria-hidden="true">ID</span>
+              <h3>Identité</h3>
+            </div>
+            <div id="profile-sheet-banner" class="profile-sheet-banner"></div>
+            <dl id="profile-sheet-identity" class="profile-sheet-identity-grid"></dl>
+          </section>
+
+          <section class="profile-sheet-panel">
+            <div class="profile-sheet-panel-title">
+              <span class="profile-sheet-icon" aria-hidden="true">RT</span>
+              <h3>Résultats de tests</h3>
+            </div>
+            <div id="profile-sheet-results" class="profile-sheet-traits-grid"></div>
+          </section>
+        </div>
+
+        <div id="profile-panel-tests" role="tabpanel" hidden>
+          <h3>Identité</h3>
+          <div id="profile-identity-section" class="fields-editor-section">
+            <ul id="profile-identity-list" class="fields-editor-list"></ul>
+            <button id="profile-identity-add-button" type="button" class="fields-editor-add-button">+ Ajouter un champ</button>
+          </div>
+          <button id="profile-identity-save-button" type="button">Enregistrer l'identité</button>
+          <p id="profile-identity-error" role="alert"></p>
+
+          <h3>Tests</h3>
+          <ul id="profile-test-list" class="card-list"></ul>
+        </div>
+
+        <p id="profile-error" role="alert"></p>
+        <button id="profile-delete-sheet-button" type="button" class="button-danger">Supprimer la fiche entière</button>
       </section>
 
       <div id="schema-field-popover" hidden>
@@ -423,8 +472,52 @@
         </form>
         <p id="modele-form-error" role="alert"></p>
       </section>
+      <section id="profile-consent-modal" hidden>
+        <h2 id="profile-consent-title">Consentement</h2>
+        <p id="profile-consent-text"></p>
+        <div class="profile-modal-actions">
+          <button id="profile-consent-cancel" type="button">Annuler</button>
+          <button id="profile-consent-start" type="button" class="button-primary">Commencer</button>
+        </div>
+      </section>
+      <section id="profile-question-modal" hidden>
+        <h2 id="profile-question-title">Question</h2>
+        <p id="profile-question-progress"></p>
+        <div id="profile-question-progress-bar">
+          <div id="profile-question-progress-fill"></div>
+        </div>
+        <form id="profile-question-form">
+          <fieldset id="profile-question-fieldset">
+            <legend id="profile-question-text"></legend>
+            <div id="profile-question-choices"></div>
+          </fieldset>
+          <div class="profile-modal-actions">
+            <button id="profile-question-previous" type="button">Précédent</button>
+            <button id="profile-question-next" type="submit">Suivant</button>
+          </div>
+        </form>
+      </section>
+      <section id="profile-result-modal" hidden>
+        <h2 id="profile-result-title">Résultat</h2>
+        <p id="profile-result-text"></p>
+        <p class="field-hint">Ce résultat est une tendance indicative, pas un diagnostic.</p>
+        <div class="profile-modal-actions">
+          <button id="profile-result-redo" type="button">Refaire</button>
+          <button id="profile-result-close" type="button" class="button-primary">Fermer</button>
+        </div>
+      </section>
+      <section id="profile-export-modal" hidden>
+        <h2>Exporter la fiche</h2>
+        <p>Choisis les sections à inclure dans l'export :</p>
+        <fieldset id="profile-export-sections"></fieldset>
+        <p id="profile-export-error" role="alert"></p>
+        <button id="profile-export-pdf-button" type="button">Exporter en PDF</button>
+        <button id="profile-export-png-button" type="button">Exporter en PNG</button>
+      </section>
     </div>
   </div>
+
+  <div id="profile-print-export" class="profile-print-export" hidden aria-hidden="true"></div>
 
   <script type="module" src="js/app.js"></script>
 </body>

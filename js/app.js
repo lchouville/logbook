@@ -68,6 +68,7 @@ import { initSidebar, renderSidebar, closeSidebarOnMobile } from './sidebar.js';
 import { openModal, closeModal } from './modal.js';
 import { renderJournalPartage, setViewerPageSize } from './viewer.js';
 import { createFieldsEditor } from './schema.js';
+import { openProfilePage } from './profile.js';
 import { createContentEditor } from './contenu.js';
 
 const APP_VERSION = '0.1.0';
@@ -89,6 +90,7 @@ appVersionEl.textContent = `Version ${APP_VERSION}`;
 const entriesSection = document.getElementById('entries');
 const journalPartageSection = document.getElementById('journal-partage');
 const modelesSection = document.getElementById('modeles');
+const profileSection = document.getElementById('profile');
 const integrationSection = document.getElementById('integration');
 const integrationCount = document.getElementById('integration-count');
 const integrationError = document.getElementById('integration-error');
@@ -2157,6 +2159,7 @@ function renderMainView() {
   entriesSection.hidden = true;
   journalPartageSection.hidden = true;
   modelesSection.hidden = true;
+  profileSection.hidden = true;
   integrationSection.hidden = true;
   settingsSection.hidden = true;
   partagesSection.hidden = true;
@@ -2167,6 +2170,8 @@ function renderMainView() {
   // rien, puisque ce bloc resterait sur journalPartageSection.
   if (mainView === 'modeles') {
     modelesSection.hidden = false;
+  } else if (mainView === 'profile') {
+    profileSection.hidden = false;
   } else if (mainView === 'integration') {
     integrationSection.hidden = false;
   } else if (mainView === 'settings') {
@@ -2231,6 +2236,12 @@ initSidebar({
   onOpenModeles: () => {
     mainView = 'modeles';
     renderMainView();
+    closeSidebarOnMobile();
+  },
+  onOpenProfile: () => {
+    mainView = 'profile';
+    renderMainView();
+    openProfilePage();
     closeSidebarOnMobile();
   },
   onOpenIntegration: () => {

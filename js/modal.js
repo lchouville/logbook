@@ -12,6 +12,10 @@ const SECTION_IDS = [
   'inspection-fiche-modal',
   'entry-move-modal',
   'entry-modele-change-modal',
+  'profile-consent-modal',
+  'profile-question-modal',
+  'profile-result-modal',
+  'profile-export-modal',
 ];
 const WIDE_SECTION_IDS = ['entry-form-modal', 'modele-form-modal'];
 const closeListeners = [];

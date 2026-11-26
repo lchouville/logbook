@@ -24,6 +24,7 @@ const PARTAGES_FILE_NAME = 'logbook-shares.json';
 const LEGACY_PARTAGES_FILE_NAME = 'logbook-partages.json';
 const MODELES_FILE_NAME = 'logbook-templates.json';
 const LEGACY_MODELES_FILE_NAME = 'logbook-modeles.json';
+const PROFILE_FILE_NAME = 'logbook-profile.json';
 const PARTAGES_RECUS_FILE_NAME = 'logbook-received-shares.json';
 const LEGACY_PARTAGES_RECUS_FILE_NAME = 'logbook-partages-recus.json';
 const PARTAGES_RECUS_FOLDER_NAME = 'received-shares';
@@ -567,6 +568,25 @@ export async function loadModeles() {
 
 export async function saveModeles(modeles) {
   return saveJsonFile(MODELES_FILE_NAME, modeles, await getAppFolderId(), undefined, LEGACY_MODELES_FILE_NAME);
+}
+
+// La fiche personnelle est globale (comme les modèles), isolée des dashboards :
+// rien du reste de l'app ne lit ni n'écrit ce fichier.
+export async function loadProfileSheet() {
+  return loadJsonFile(PROFILE_FILE_NAME, null, await getAppFolderId());
+}
+
+export async function saveProfileSheet(profile) {
+  return saveJsonFile(PROFILE_FILE_NAME, profile, await getAppFolderId());
+}
+
+export async function deleteProfileSheet() {
+  const appFolderId = await getAppFolderId();
+  const fileId = await findFileId(PROFILE_FILE_NAME, appFolderId);
+  if (!fileId) return;
+  const response = await driveFetch(`${filesUrl()}/${fileId}`, { method: 'DELETE' });
+  if (!response.ok && response.status !== 404) throw new Error(`Suppression de la fiche personnelle : ${await describeError(response)}`);
+  fileIdCache.delete(`${appFolderId}:${PROFILE_FILE_NAME}`);
 }
 
 export async function createSharedFile(fileName, entries, dashboardId) {

@@ -14,6 +14,7 @@ const sidebarJournaux = document.getElementById('sidebar-journaux');
 const sidebarJournauxPlus = document.getElementById('sidebar-journaux-plus');
 const sidebarPartageButton = document.getElementById('sidebar-partage-button');
 const sidebarModelesButton = document.getElementById('sidebar-modeles-button');
+const sidebarProfileSheetButton = document.getElementById('sidebar-profile-sheet-button');
 const sidebarIntegrationButton = document.getElementById('sidebar-integration-button');
 
 function closeProfileMenu() {
@@ -73,6 +74,7 @@ export function initSidebar({
   onOpenPartages,
   onOpenAcces,
   onOpenModeles,
+  onOpenProfile,
   onOpenIntegration,
   onSelectDashboard,
   onCreateDashboard,
@@ -84,6 +86,7 @@ export function initSidebar({
   sidebarSettingsButton.addEventListener('click', onOpenSettings);
   sidebarPartageButton.addEventListener('click', onOpenPartages);
   sidebarModelesButton.addEventListener('click', onOpenModeles);
+  sidebarProfileSheetButton.addEventListener('click', onOpenProfile);
   sidebarIntegrationButton.addEventListener('click', onOpenIntegration);
   sidebarJournauxPlus.addEventListener('click', onOpenAcces);
   sidebarJournaux.addEventListener('click', (event) => {
