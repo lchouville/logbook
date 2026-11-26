@@ -11,9 +11,12 @@
   --color-accent: #1a6dc4;
   --color-accent-fg: #ffffff;
   --color-danger: #cc3a3a;
+  --color-accent-hover: #15599e;
   --radius: 6px;
   --radius-sm: 4px;
   --shadow-card: 0 1px 2px rgba(15, 15, 15, 0.1);
+  --shadow-popover: 0 4px 12px rgba(15, 15, 15, 0.15);
+  --transition-fast: 0.12s ease;
 
   /* Palette catégorielle validée (skill dataviz) — ordre fixe, jamais cyclé */
   --series-1: #2a78d6;
@@ -35,7 +38,9 @@
     --color-accent: #5fb3f0;
     --color-accent-fg: #191919;
     --color-danger: #ff6b6b;
+    --color-accent-hover: #86c8f5;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.5);
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
@@ -55,7 +60,9 @@
   --color-accent: #5fb3f0;
   --color-accent-fg: #191919;
   --color-danger: #ff6b6b;
+  --color-accent-hover: #86c8f5;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.5);
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
@@ -104,6 +111,11 @@ body {
 
 a {
   color: var(--color-accent);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--color-accent-hover);
 }
 
 h1 {
@@ -144,25 +156,37 @@ textarea {
 
 button {
   padding: 0.375rem 0.75rem;
+  min-height: 2rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-bg-secondary);
   cursor: pointer;
-  transition: background-color 0.1s ease;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
 }
 
 button:hover {
   background: var(--color-bg-hover);
 }
 
+button:active {
+  opacity: 0.85;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 button[type="submit"] {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-fg);
+  font-weight: 600;
 }
 
 button[type="submit"]:hover {
-  opacity: 0.9;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 
 .button-danger {
@@ -184,6 +208,25 @@ textarea {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0.375rem 0.5rem;
+  transition: border-color var(--transition-fast);
+}
+
+select,
+input:not([type="checkbox"]):not([type="radio"]),
+textarea {
+  min-height: 2rem;
+}
+
+select:hover,
+input:not([type="checkbox"]):not([type="radio"]):hover,
+textarea:hover {
+  border-color: var(--color-fg-secondary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-fg-secondary);
+  opacity: 1;
 }
 
 button:focus-visible,
@@ -210,19 +253,36 @@ form button[type="submit"] {
 }
 
 #auth {
-  max-width: 40rem;
+  max-width: 28rem;
   width: 100%;
+  min-height: 100vh;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 1.25rem;
   box-sizing: border-box;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
   gap: 0.75rem;
-  flex-wrap: wrap;
+}
+
+#auth h1 {
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
 }
 
 #auth p {
   margin: 0;
+}
+
+#auth #sign-in {
+  margin-top: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  #auth {
+    align-items: center;
+    text-align: center;
+  }
 }
 
 #settings {
@@ -502,7 +562,7 @@ form button[type="submit"] {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-popover);
   padding: 0.25rem;
   display: flex;
   flex-direction: column;
@@ -546,12 +606,20 @@ form button[type="submit"] {
 .sidebar-dashboard-actions {
   display: flex;
   gap: 0.125rem;
-  visibility: hidden;
 }
 
-.sidebar-dashboard-item:hover .sidebar-dashboard-actions,
-.sidebar-dashboard-item:focus-within .sidebar-dashboard-actions {
-  visibility: visible;
+/* Masqués par défaut uniquement quand la souris permet un survol : sur
+   écran tactile (pas de hover fiable), ils restent toujours visibles pour
+   rester atteignables. */
+@media (hover: hover) {
+  .sidebar-dashboard-actions {
+    visibility: hidden;
+  }
+
+  .sidebar-dashboard-item:hover .sidebar-dashboard-actions,
+  .sidebar-dashboard-item:focus-within .sidebar-dashboard-actions {
+    visibility: visible;
+  }
 }
 
 .sidebar-dashboard-action {
@@ -596,9 +664,11 @@ form button[type="submit"] {
 #sidebar-modeles-button {
   display: block;
   width: 100%;
+  min-height: 2.25rem;
   text-align: left;
   background: transparent;
   border-color: transparent;
+  border-radius: var(--radius-sm);
 }
 
 #sidebar-dashboards button:hover,
@@ -654,6 +724,55 @@ form button[type="submit"] {
 
   #main-content {
     margin-left: 0;
+    padding: 4.5rem 1rem 1.5rem;
+  }
+
+  #entries-header,
+  #modeles-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #entries-header-actions {
+    flex-wrap: wrap;
+  }
+
+  .entry-property-row,
+  .entry-block-row {
+    flex-wrap: wrap;
+  }
+
+  .entry-property-row label,
+  .entry-property-label,
+  .entry-block-row label {
+    flex-basis: 100%;
+  }
+
+  /* Cibles tactiles confortables (RGAA/WCAG 2.5.8) : les boutons et contrôles
+     de formulaire restent petits en desktop (souris) mais doivent atteindre
+     ~44px de haut au doigt. Les boutons icône seul (fermer, menu) gardent en
+     plus une largeur minimale pour ne pas devenir une cible trop étroite. */
+  button,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]),
+  .entry-block-edit-button {
+    min-height: 2.75rem;
+  }
+
+  #sidebar-toggle,
+  #modal-close {
+    min-width: 2.75rem;
+  }
+
+  #entry-table th:first-child,
+  #entry-table td:first-child {
+    width: 2.75rem;
+  }
+
+  #entry-select-all,
+  input[type="checkbox"] {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
   }
 }
 
@@ -678,12 +797,14 @@ form button[type="submit"] {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-fg);
+  font-weight: 600;
   white-space: nowrap;
 }
 
 #entry-new-button:hover,
 #modele-new-button:hover {
-  opacity: 0.9;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 
 #entries-header-actions {
@@ -711,7 +832,7 @@ form button[type="submit"] {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-popover);
   padding: 0.25rem;
   display: flex;
   flex-direction: column;
@@ -789,10 +910,16 @@ form button[type="submit"] {
 
 #entry-table-body tr {
   cursor: pointer;
+  transition: background-color var(--transition-fast);
 }
 
 #entry-table-body tr:hover {
   background: var(--color-bg-hover);
+}
+
+#entry-table-body tr.entry-row-selected {
+  background: var(--color-bg-hover);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 #entry-table-body tr:focus-visible {
@@ -902,6 +1029,42 @@ form button[type="submit"] {
 .entry-page-title:focus-visible {
   border-color: transparent;
   outline-offset: 2px;
+}
+
+/* Reset du style par défaut du <fieldset> : il ne sert ici qu'à activer/
+   désactiver tout le formulaire d'un coup (vue lecture seule d'une entrée),
+   pas à créer un groupe visuel. */
+#entry-form-fields {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Lecture seule d'une entrée existante (voir setEntryFormReadOnly dans
+   js/app.js) : les champs natifs désactivés par le fieldset doivent se lire
+   comme du texte statique, pas comme un formulaire grisé/cassé, dans les
+   deux thèmes. */
+#entry-form-fields:disabled .entry-page-title,
+#entry-form-fields:disabled input,
+#entry-form-fields:disabled select,
+#entry-form-fields:disabled textarea {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-fg);
+  opacity: 1;
+  -webkit-text-fill-color: currentColor;
+  cursor: default;
+  padding-left: 0;
+}
+
+#entry-form-fields:disabled .drag-handle,
+#entry-form-fields:disabled button {
+  display: none;
+}
+
+#entry-edit {
+  margin-right: 0.5rem;
 }
 
 #entry-properties {

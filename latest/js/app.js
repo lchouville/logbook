@@ -128,7 +128,9 @@ const modeleFormError = document.getElementById('modele-form-error');
 const entryNewButton = document.getElementById('entry-new-button');
 const entryNewMenu = document.getElementById('entry-new-menu');
 const entryForm = document.getElementById('entry-form');
+const entryFormFields = document.getElementById('entry-form-fields');
 const entryFormTitle = document.getElementById('entry-form-title');
+const entryEditButton = document.getElementById('entry-edit');
 const entrySubmitButton = document.getElementById('entry-submit');
 const entryDeleteButton = document.getElementById('entry-delete');
 const entryTitre = document.getElementById('entry-titre');
@@ -600,6 +602,7 @@ function renderEntries() {
     row.dataset.entryId = entry.id;
     row.tabIndex = 0;
     if (entry.archive) row.classList.add('entry-row-archived');
+    if (selectedEntryIds.has(entry.id)) row.classList.add('entry-row-selected');
 
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
@@ -649,6 +652,18 @@ function stopEditEntry() {
   entrySubmitButton.textContent = 'Enregistrer';
   entryDeleteButton.hidden = true;
   entryError.textContent = '';
+  setEntryFormReadOnly(false);
+}
+
+// Les entrées existantes s'ouvrent en lecture (fieldset désactivé) avec un
+// bouton « Modifier » ; une nouvelle entrée s'ouvre toujours directement
+// éditable.
+function setEntryFormReadOnly(readOnly) {
+  entryFormFields.disabled = readOnly;
+  entryFieldsEditor.setReadOnly(readOnly);
+  entryEditButton.hidden = !readOnly;
+  entrySubmitButton.hidden = readOnly;
+  entryDeleteButton.hidden = readOnly || !editingEntryId;
 }
 
 function applyFixedFieldsToForm(fields, els) {
@@ -673,10 +688,10 @@ function startEditEntry(entry) {
   renderRessentiAFroidSlot(entry);
   entryFieldsEditor.render(entry.champsSchema ?? blankChampsSchema(), entry.champsPersonnalises ?? {});
   entryContentEditor.render(entry.contenuSchema, entry.contenuValeurs ?? {}, Boolean(entry.modeleId));
-  entryFormTitle.textContent = 'Modifier l’entrée';
+  entryFormTitle.textContent = entry.titre || 'Entrée';
   entrySubmitButton.textContent = 'Enregistrer les modifications';
-  entryDeleteButton.hidden = false;
   entryError.textContent = '';
+  setEntryFormReadOnly(true);
   openModal('entry-form-modal');
 }
 
@@ -2613,6 +2628,8 @@ entryForm.addEventListener('submit', async (event) => {
     entryError.textContent = `Échec de l'enregistrement : ${error.message}`;
   }
 });
+
+entryEditButton.addEventListener('click', () => setEntryFormReadOnly(false));
 
 entryDeleteButton.addEventListener('click', async () => {
   if (!editingEntryId) return;
