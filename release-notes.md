@@ -62,3 +62,18 @@
 ### 🐛 Corrections
 
 - fix(ci): régénère portfolio.json aussi à la publication d'une release (#72)
+
+## v0.2.0 - 2026-11-26
+
+## Changements
+
+- release: v0.2.0 (#76)
+
+## 🚀 Fonctionnalités
+
+- feat(entries): style graphique, UX et lecture seule des entrées (#75)
+
+## 📝 Documentation
+
+- docs: add release notes for v0.1.1 (#74)
+
