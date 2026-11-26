@@ -1488,6 +1488,10 @@ modeleForm.addEventListener('submit', async (event) => {
 
 let integrationLoading = false;
 let integrationTotal = 0;
+// Deux appels peuvent se chevaucher (double clic sur "Intégration", reconnexion de
+// dossier pendant un chargement en cours) : sans ce garde-fou, les deux écrivent dans
+// la même variable integrationFiles et produisent doublons ou pertes de fiches.
+let integrationRequestId = 0;
 // Groupes (par clé de titre généralisée, ou "clé::sous-groupe" pour un sous-groupe)
 // repliés par l'utilisateur — persiste tant que la clé ne change pas, même quand la
 // liste se re-rend après une sélection.
@@ -1859,6 +1863,7 @@ function renderIntegrationList() {
 const INTEGRATION_BATCH_SIZE = 5;
 
 async function loadIntegrationFiles() {
+  const requestId = ++integrationRequestId;
   integrationError.textContent = '';
   integrationFiles = [];
   integrationTotal = 0;
@@ -1866,6 +1871,7 @@ async function loadIntegrationFiles() {
   renderIntegrationList();
   try {
     const files = await listIntegrationFiles();
+    if (requestId !== integrationRequestId) return;
     integrationTotal = files.length;
     const dashboardsActifs = dashboards.filter((d) => !d.archive);
     // Un seul tableau de bord : pas d'ambiguïté possible, on le présélectionne.
@@ -1886,10 +1892,12 @@ async function loadIntegrationFiles() {
           }
         }),
       );
+      if (requestId !== integrationRequestId) return;
       integrationFiles = [...integrationFiles, ...batchResults];
       renderIntegrationList();
     }
   } catch (error) {
+    if (requestId !== integrationRequestId) return;
     integrationFiles = [];
     integrationError.textContent =
       error.message === LOGBOOK_FOLDER_NOT_CONNECTED
