@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Logbook</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -311,52 +312,56 @@
       <section id="entry-form-modal" hidden>
         <h2 id="entry-form-title">Nouvelle entrée</h2>
         <form id="entry-form">
-          <label for="entry-titre" class="sr-only">Titre</label>
-          <input id="entry-titre" type="text" class="entry-page-title" placeholder="Sans titre" required>
+          <fieldset id="entry-form-fields">
+            <legend class="sr-only">Détails de l'entrée</legend>
+            <label for="entry-titre" class="sr-only">Titre</label>
+            <input id="entry-titre" type="text" class="entry-page-title" placeholder="Sans titre" required>
 
-          <div id="entry-properties">
-            <div class="entry-property-row">
-              <label for="entry-date" class="entry-property-label">Date</label>
-              <input id="entry-date" type="date" class="entry-property-value" required>
+            <div id="entry-properties">
+              <div class="entry-property-row">
+                <label for="entry-date" class="entry-property-label">Date</label>
+                <input id="entry-date" type="date" class="entry-property-value" required>
+              </div>
             </div>
-          </div>
 
-          <div id="entry-blocks-section" class="fields-editor-section">
-            <ul id="entry-blocks-list" class="fields-editor-list">
-              <li class="entry-block-row" draggable="true" data-order-key="themes">
-                <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
-                <label for="entry-themes">Thème(s)</label>
-                <select id="entry-themes" multiple required></select>
-              </li>
-              <li class="entry-block-row" draggable="true" data-order-key="niveau">
-                <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
-                <label for="entry-niveau">Niveau d'accès</label>
-                <select id="entry-niveau" required>
-                  <option value="" disabled selected>Choisir…</option>
-                </select>
-              </li>
-              <li class="entry-block-row" draggable="true" data-order-key="statut">
-                <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
-                <label for="entry-statut">Statut</label>
-                <select id="entry-statut" required>
-                  <option value="" disabled selected>Choisir…</option>
-                </select>
-              </li>
-            </ul>
-            <button id="entry-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
-          </div>
-
-          <div id="entry-ressenti-froid-slot" class="entry-property-row" hidden></div>
-
-          <div id="entry-contenu-section" class="contenu-section">
-            <h3 class="contenu-section-titre">Contenu</h3>
-            <div id="entry-contenu-list" class="contenu-list"></div>
-            <div class="contenu-add-buttons">
-              <button id="entry-contenu-add-texte" type="button">+ Bloc texte</button>
-              <button id="entry-contenu-add-tableau" type="button">+ Bloc tableau</button>
+            <div id="entry-blocks-section" class="fields-editor-section">
+              <ul id="entry-blocks-list" class="fields-editor-list">
+                <li class="entry-block-row" draggable="true" data-order-key="themes">
+                  <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
+                  <label for="entry-themes">Thème(s)</label>
+                  <select id="entry-themes" multiple required></select>
+                </li>
+                <li class="entry-block-row" draggable="true" data-order-key="niveau">
+                  <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
+                  <label for="entry-niveau">Niveau d'accès</label>
+                  <select id="entry-niveau" required>
+                    <option value="" disabled selected>Choisir…</option>
+                  </select>
+                </li>
+                <li class="entry-block-row" draggable="true" data-order-key="statut">
+                  <span class="drag-handle" aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14" fill="none"><circle cx="2.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="2.5" r="1.2" fill="currentColor"/><circle cx="2.5" cy="7" r="1.2" fill="currentColor"/><circle cx="7.5" cy="7" r="1.2" fill="currentColor"/><circle cx="2.5" cy="11.5" r="1.2" fill="currentColor"/><circle cx="7.5" cy="11.5" r="1.2" fill="currentColor"/></svg></span>
+                  <label for="entry-statut">Statut</label>
+                  <select id="entry-statut" required>
+                    <option value="" disabled selected>Choisir…</option>
+                  </select>
+                </li>
+              </ul>
+              <button id="entry-add-field-button" type="button" class="fields-editor-add-button">+ Ajouter une propriété</button>
             </div>
-          </div>
 
+            <div id="entry-ressenti-froid-slot" class="entry-property-row" hidden></div>
+
+            <div id="entry-contenu-section" class="contenu-section">
+              <h3 class="contenu-section-titre">Contenu</h3>
+              <div id="entry-contenu-list" class="contenu-list"></div>
+              <div class="contenu-add-buttons">
+                <button id="entry-contenu-add-texte" type="button">+ Bloc texte</button>
+                <button id="entry-contenu-add-tableau" type="button">+ Bloc tableau</button>
+              </div>
+            </div>
+          </fieldset>
+
+          <button id="entry-edit" type="button" hidden>Modifier</button>
           <button id="entry-submit" type="submit">Enregistrer</button>
           <button id="entry-delete" type="button" hidden>Supprimer l'entrée</button>
         </form>
